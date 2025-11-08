@@ -17,6 +17,8 @@ MAX_SEQ_LENGTH = 450     # max tokens per sample (based on python notebook)
 TEST_SIZE = 0.2          # 80% train, 20% test
 RANDOM_STATE = 42        # for reproducibility (based on python notebook)
 EMBEDDING_DIM = 100      # embedding vector size
+BATCH_SIZE = 64
+EPOCHS = 5
 
 def load_dataset(path: str):
     df = pd.read_csv(path)
@@ -170,7 +172,35 @@ model = build_lstm_model(
     input_length=MAX_SEQ_LENGTH,
     num_classes=num_classes
 )
+
 '''
 #Building the model...
 print(model.summary())
 '''
+
+def train(model,
+          X_train,
+          y_train,
+          batch_size=BATCH_SIZE,
+          epochs=EPOCHS):
+    
+    #Training the Model, straightforward. 
+    train_history = model.fit(
+        X_train,
+        y_train,
+        batch_size=batch_size,
+        epochs=epochs,
+        validation_split=0.1,
+        verbose=1
+    )
+    return train_history
+
+def evaluate(model, X_test, y_test):
+    print("\nTesting out the model...")
+    loss, acc = model.evaluate(X_test, y_test, verbose=0)
+    print(f"Test Loss: {loss:.4f}")
+    print(f"Test Accuracy: {acc:.4f}")
+    return loss, acc
+
+train(model, X_train, y_train)
+evaluate(model, X_test, y_test)
