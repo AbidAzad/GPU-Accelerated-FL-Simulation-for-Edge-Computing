@@ -7,6 +7,8 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dropout, Dense
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_PATH = BASE_DIR / "CyberThreatDataset" / "cyber-threat-intelligence_all.csv"
@@ -14,6 +16,7 @@ MAX_NB_WORDS = 50000     # max vocabulary size
 MAX_SEQ_LENGTH = 450     # max tokens per sample (based on python notebook)
 TEST_SIZE = 0.2          # 80% train, 20% test
 RANDOM_STATE = 42        # for reproducibility (based on python notebook)
+EMBEDDING_DIM = 100      # embedding vector size
 
 def load_dataset(path: str):
     df = pd.read_csv(path)
@@ -123,4 +126,51 @@ print(f"  {min(len(tokenizer.word_index) + 1, MAX_NB_WORDS)}")
 print("\n[5] Sequence Length Check (should equal MAX_SEQ_LENGTH):")
 print(f"  X_train[0] length: {len(X_train[0])}")
 print(f"  X_test[0]  length: {len(X_test[0])}")
+'''
+
+def build_lstm_model(max_words: int,
+                     embedding_dim: int,
+                     input_length: int,
+                     num_classes: int) -> Sequential:
+
+    model = Sequential()
+    # Embedding: learns word vectors from scratch
+    model.add(Embedding(
+        input_dim=max_words,
+        output_dim=embedding_dim,
+        input_length=input_length
+    ))
+
+    # LSTM layer:
+    #  - 150 units like the notebook
+    #  - dropout: regularization on inputs
+    #  - recurrent_dropout: regularization on recurrent connections
+    model.add(LSTM(150, dropout=0.2, recurrent_dropout=0.2))
+
+    # Dropout before final layer to reduce overfitting
+    model.add(Dropout(0.2))
+
+    # Output layer:
+    #  - num_classes units
+    #  - softmax for multi-class probabilities
+    model.add(Dense(num_classes, activation="softmax"))
+
+    # Compile with standard settings for classification
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"]
+    )
+
+    return model
+
+model = build_lstm_model(
+    max_words=MAX_NB_WORDS,
+    embedding_dim=EMBEDDING_DIM,
+    input_length=MAX_SEQ_LENGTH,
+    num_classes=num_classes
+)
+'''
+#Building the model...
+print(model.summary())
 '''
