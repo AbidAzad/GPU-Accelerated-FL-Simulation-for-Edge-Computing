@@ -1,5 +1,7 @@
 import re
 from pathlib import Path
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import pandas as pd
 from sklearn.model_selection import train_test_split

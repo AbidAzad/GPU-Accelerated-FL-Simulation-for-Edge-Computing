@@ -1,0 +1,14 @@
+Box (single machine)
+ - CPU: AMD Ryzen 7 5700X (8 cores / 16 threads @ ~3.4 GHz)
+ - RAM: 32 GB
+
+Centralized baseline (10 epochs)
+ - Wall-time: ~23 min
+ - Final test acc: 0.8771
+ - Per-epoch ~134–144 s on full train set (15,952 samples, batch=64).
+
+FL simulator (4 clients, 15 rounds, local_epochs=1)
+ - Threads: 4 workers × (intra=4, inter=1) ⇒ saturates 16 logical CPUs
+ - Per-round client time: ~80–83 s (all clients in parallel)
+ - Wall-time: ~20.86 min
+ - Final test acc: 0.8330
