@@ -12,3 +12,161 @@ FL simulator (4 clients, 15 rounds, local_epochs=1)
  - Per-round client time: ~80–83 s (all clients in parallel)
  - Wall-time: ~20.86 min
  - Final test acc: 0.8330
+
+ FL Server Run (3 Computers (not exactly four, would like to try to mimic simulator))
+    [SRV] prepping data...
+    [SRV][R0] -> NANO: n=4000
+    [SRV][R0] -> PIXEL: n=4000
+    [SRV][R0] (server) done: n=4000, train=33.57s
+    [SRV][R0] <- NANO: n=4000, train=57.52s
+    [SRV][R0] <- PIXEL: n=4000, train=90.25s
+    [SRV] calibration done | NANO: thr=69.5 samp/s | PIXEL: thr=44.3 samp/s | server: thr=119.1 samp/s
+    [SRV] sticky shard sizes: NANO: 4760 | PIXEL: 3034 | server: 8158
+
+    [SRV][R1] start
+    [SRV][R1] -> NANO: n=4760
+    [SRV][R1] -> PIXEL: n=3034
+    [SRV][R1] <- PIXEL: n=3034, train=41.10s
+    [SRV][R1] <- NANO: n=4760, train=70.42s
+    [SRV][R1] (server) done: n=8158, train=73.95s
+    [SRV][R1] agg=0.03s | round=77.30s
+    [SRV][R1] hosts { NANO:n=4760,t=70.42s | PIXEL:n=3034,t=41.10s | server:n=8158,t=73.95s }
+
+    [SRV][R2] start
+    [SRV][R2] -> PIXEL: n=3034 (cached shard)
+    [SRV][R2] -> NANO: n=4760 (cached shard)
+    [SRV][R2] <- PIXEL: n=3034, train=40.75s
+    [SRV][R2] (server) done: n=8158, train=69.35s
+    [SRV][R2] <- NANO: n=4760, train=72.59s
+    [SRV][R2] agg=0.03s | round=73.60s
+    [SRV][R2] hosts { NANO:n=4760,t=72.59s | PIXEL:n=3034,t=40.75s | server:n=8158,t=69.35s }
+
+    [SRV][R3] start
+    [SRV][R3] -> PIXEL: n=3034 (cached shard)
+    [SRV][R3] -> NANO: n=4760 (cached shard)
+    [SRV][R3] <- PIXEL: n=3034, train=42.42s
+    [SRV][R3] (server) done: n=8158, train=67.83s
+    [SRV][R3] <- NANO: n=4760, train=79.63s
+    [SRV][R3] agg=0.03s | round=80.59s
+    [SRV][R3] hosts { NANO:n=4760,t=79.63s | PIXEL:n=3034,t=42.42s | server:n=8158,t=67.83s }
+
+    [SRV][R4] start
+    [SRV][R4] -> NANO: n=4760 (cached shard)
+    [SRV][R4] -> PIXEL: n=3034 (cached shard)
+    [SRV][R4] <- PIXEL: n=3034, train=41.12s
+    WARNING:tensorflow:5 out of the last 8 calls to <function TensorFlowTrainer._make_function.<locals>.multi_step_on_iterator at 0x00000167525AA980> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+    [SRV][R4] <- NANO: n=4760, train=79.14s
+    [SRV][R4] (server) done: n=8158, train=88.12s
+    [SRV][R4] agg=0.03s | round=91.41s
+    [SRV][R4] hosts { NANO:n=4760,t=79.14s | PIXEL:n=3034,t=41.12s | server:n=8158,t=88.12s }
+
+    [SRV][R5] start
+    [SRV][R5] -> PIXEL: n=3034 (cached shard)
+    [SRV][R5] -> NANO: n=4760 (cached shard)
+    WARNING:tensorflow:6 out of the last 10 calls to <function TensorFlowTrainer._make_function.<locals>.multi_step_on_iterator at 0x00000167437BEAC0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+    [SRV][R5] <- PIXEL: n=3034, train=42.57s
+    [SRV][R5] (server) done: n=8158, train=75.92s
+    [SRV][R5] <- NANO: n=4760, train=79.29s
+    [SRV][R5] agg=0.03s | round=80.32s
+    [SRV][R5] hosts { NANO:n=4760,t=79.29s | PIXEL:n=3034,t=42.57s | server:n=8158,t=75.92s }
+
+    [SRV][R6] start
+    [SRV][R6] -> NANO: n=4760 (cached shard)
+    [SRV][R6] -> PIXEL: n=3034 (cached shard)
+    [SRV][R6] <- PIXEL: n=3034, train=41.62s
+    [SRV][R6] <- NANO: n=4760, train=79.06s
+    [SRV][R6] (server) done: n=8158, train=76.58s
+    [SRV][R6] agg=0.03s | round=79.95s
+    [SRV][R6] hosts { NANO:n=4760,t=79.06s | PIXEL:n=3034,t=41.62s | server:n=8158,t=76.58s }
+
+    [SRV][R7] start
+    [SRV][R7] -> NANO: n=4760 (cached shard)
+    [SRV][R7] -> PIXEL: n=3034 (cached shard)
+    [SRV][R7] <- PIXEL: n=3034, train=42.39s
+    [SRV][R7] (server) done: n=8158, train=67.85s
+    [SRV][R7] <- NANO: n=4760, train=78.40s
+    [SRV][R7] agg=0.03s | round=78.52s
+    [SRV][R7] hosts { NANO:n=4760,t=78.40s | PIXEL:n=3034,t=42.39s | server:n=8158,t=67.85s }
+
+    [SRV][R8] start
+    [SRV][R8] -> PIXEL: n=3034 (cached shard)
+    [SRV][R8] -> NANO: n=4760 (cached shard)
+    [SRV][R8] <- PIXEL: n=3034, train=40.39s
+    [SRV][R8] <- NANO: n=4760, train=79.25s
+    [SRV][R8] (server) done: n=8158, train=90.14s
+    [SRV][R8] agg=0.03s | round=93.40s
+    [SRV][R8] hosts { NANO:n=4760,t=79.25s | PIXEL:n=3034,t=40.39s | server:n=8158,t=90.14s }
+
+    [SRV][R9] start
+    [SRV][R9] -> NANO: n=4760 (cached shard)
+    [SRV][R9] -> PIXEL: n=3034 (cached shard)
+    [SRV][R9] <- PIXEL: n=3034, train=41.57s
+    [SRV][R9] (server) done: n=8158, train=74.85s
+    [SRV][R9] <- NANO: n=4760, train=78.22s
+    [SRV][R9] agg=0.03s | round=78.34s
+    [SRV][R9] hosts { NANO:n=4760,t=78.22s | PIXEL:n=3034,t=41.57s | server:n=8158,t=74.85s }
+
+    [SRV][R10] start
+    [SRV][R10] -> PIXEL: n=3034 (cached shard)
+    [SRV][R10] -> NANO: n=4760 (cached shard)
+    [SRV][R10] <- PIXEL: n=3034, train=46.62s
+    [SRV][R10] <- NANO: n=4760, train=82.76s
+    [SRV][R10] (server) done: n=8158, train=96.96s
+    [SRV][R10] agg=0.03s | round=100.17s
+    [SRV][R10] hosts { NANO:n=4760,t=82.76s | PIXEL:n=3034,t=46.62s | server:n=8158,t=96.96s }
+
+    [SRV][R11] start
+    [SRV][R11] -> PIXEL: n=3034 (cached shard)
+    [SRV][R11] -> NANO: n=4760 (cached shard)
+    [SRV][R11] <- PIXEL: n=3034, train=41.80s
+    [SRV][R11] <- NANO: n=4760, train=83.03s
+    [SRV][R11] (server) done: n=8158, train=81.46s
+    [SRV][R11] agg=0.03s | round=84.76s
+    [SRV][R11] hosts { NANO:n=4760,t=83.03s | PIXEL:n=3034,t=41.80s | server:n=8158,t=81.46s }
+
+    [SRV][R12] start
+    [SRV][R12] -> PIXEL: n=3034 (cached shard)
+    [SRV][R12] -> NANO: n=4760 (cached shard)
+    [SRV][R12] <- PIXEL: n=3034, train=40.49s
+    [SRV][R12] (server) done: n=8158, train=69.88s
+    [SRV][R12] <- NANO: n=4760, train=85.46s
+    [SRV][R12] agg=0.03s | round=86.30s
+    [SRV][R12] hosts { NANO:n=4760,t=85.46s | PIXEL:n=3034,t=40.49s | server:n=8158,t=69.88s }
+
+    [SRV][R13] start
+    [SRV][R13] -> PIXEL: n=3034 (cached shard)
+    [SRV][R13] -> NANO: n=4760 (cached shard)
+    [SRV][R13] <- PIXEL: n=3034, train=41.86s
+    [SRV][R13] <- NANO: n=4760, train=86.86s
+    [SRV][R13] (server) done: n=8158, train=94.23s
+    [SRV][R13] agg=0.03s | round=97.50s
+    [SRV][R13] hosts { NANO:n=4760,t=86.86s | PIXEL:n=3034,t=41.86s | server:n=8158,t=94.23s }
+
+    [SRV][R14] start
+    [SRV][R14] -> NANO: n=4760 (cached shard)
+    [SRV][R14] -> PIXEL: n=3034 (cached shard)
+    [SRV][R14] <- PIXEL: n=3034, train=44.82s
+    [SRV][R14] (server) done: n=8158, train=82.94s
+    [SRV][R14] <- NANO: n=4760, train=89.43s
+    [SRV][R14] agg=0.03s | round=89.57s
+    [SRV][R14] hosts { NANO:n=4760,t=89.43s | PIXEL:n=3034,t=44.82s | server:n=8158,t=82.94s }
+
+    [SRV][R15] start
+    [SRV][R15] -> NANO: n=4760 (cached shard)
+    [SRV][R15] -> PIXEL: n=3034 (cached shard)
+    [SRV][R15] <- PIXEL: n=3034, train=41.76s
+    [SRV][R15] <- NANO: n=4760, train=84.69s
+    [SRV][R15] (server) done: n=8158, train=84.32s
+    [SRV][R15] agg=0.03s | round=87.59s
+    [SRV][R15] hosts { NANO:n=4760,t=84.69s | PIXEL:n=3034,t=41.76s | server:n=8158,t=84.32s }
+
+    [SRV][R16] start
+    [SRV][R16] -> NANO: n=4760 (cached shard)
+    [SRV][R16] -> PIXEL: n=3034 (cached shard)
+    [SRV][R16] <- PIXEL: n=3034, train=40.78s
+    [SRV][R16] (server) done: n=8158, train=70.82s
+    [SRV][R16] <- NANO: n=4760, train=87.46s
+    [SRV][R16] agg=0.03s | round=87.69s
+    [SRV][R16] hosts { NANO:n=4760,t=87.46s | PIXEL:n=3034,t=40.78s | server:n=8158,t=70.82s }
+
+    [SRV] done | rounds=16 | total=22.85 min | acc=0.8556

@@ -39,7 +39,7 @@ from Centralized_LSTM import (
 # Basic configuration
 # ============================
 num_clients = 4                 # number of simulated clients (processes)
-num_rounds = 15                 # how many FL rounds to run
+num_rounds = 20                 # how many FL rounds to run
 local_epochs = 1                # epochs per client per round
 local_batch = 64                # batch size per client
 reshuffle_each_round = False     # re-split data every round to keep shards fresh
