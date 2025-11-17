@@ -11,6 +11,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dropout, Dense
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 # -----------------------------
 # Basic configuration
@@ -28,8 +29,8 @@ MAX_SEQ_LENGTH = 450      # Max tokens per sample (matches notebook choice)
 TEST_SIZE = 0.2           # 80% train, 20% test
 RANDOM_STATE = 42         # For reproducibility
 EMBEDDING_DIM = 100       # Embedding vector size
-BATCH_SIZE = 64
-EPOCHS = 10
+BATCH_SIZE = 24
+EPOCHS = 40               # rely on early stopping instead of a hard stop
 
 
 # -----------------------------
@@ -172,6 +173,11 @@ def train(
     """
     Train the given model on the training data.
     """
+    cb = [
+        EarlyStopping(monitor="val_accuracy", patience=4, mode="max", restore_best_weights=True, verbose=1),
+        ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=2, min_lr=1e-5, verbose=1),
+    ]
+
     print("\n[TRAIN] Starting training...")
     train_history = model.fit(
         X_train,
@@ -179,6 +185,8 @@ def train(
         batch_size=batch_size,
         epochs=epochs,
         validation_split=0.1,  # small validation slice from training data
+        callbacks=cb,
+        #shuffle=True,
         verbose=1
     )
     return train_history
