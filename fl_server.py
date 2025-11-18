@@ -27,20 +27,14 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 from flask import Flask, request, jsonify
 import numpy as np
 
-from fl_core import (
-    DATA_PATH, BATCH_SIZE, EMBEDDING_DIM, MAX_NB_WORDS, MAX_SEQ_LENGTH,
-    load_text_label_data, prepare_encoded_padded_data,
-    build_lstm_model, prime_model,
-    arrays_to_b64, arrays_from_b64, weights_to_b64, weights_from_b64,
-    fedavg_weighted_average,  # <- CUDA C++ will replace this call inside _aggregate()
-)
+import fl_core
 
 app = Flask(__name__)
 
 # ======================== Config (one place) ========================
 TOTAL_ROUNDS: int = 16
 LOCAL_EPOCHS: int = 1
-LOCAL_BATCH:  int = BATCH_SIZE
+LOCAL_BATCH:  int = 64
 
 # One knob for how we split training data
 #   "sticky_calibrated" | "sticky_equal" | "adaptive_each_round"
@@ -95,13 +89,12 @@ STICKY_SPLITS: Optional[Dict[str, np.ndarray]] = None
 
 # ======================== Data prep once ========================
 print("[SRV] prepping data...")
-df = load_text_label_data(DATA_PATH)
-X_train_all, X_test, y_train_all, y_test, NUM_CLASSES, tokenizer, label_encoder = prepare_encoded_padded_data(df)
+X_train_all, X_test, y_train_all, y_test, num_classes = fl_core.load_data()
 y_train_int = np.argmax(y_train_all, axis=1)  # used for stratified splits
 
 
 def _build_global_model():
-    return build_lstm_model(MAX_NB_WORDS, EMBEDDING_DIM, MAX_SEQ_LENGTH, NUM_CLASSES)
+    return fl_core.build_model(num_classes)
 
 
 def _ensure_global_weights():
@@ -110,7 +103,7 @@ def _ensure_global_weights():
     """
     global GLOBAL_WEIGHTS, SERVER_VELOCITY
     m = _build_global_model()
-    prime_model(m)
+    fl_core.prime_model(m)
     GLOBAL_WEIGHTS = m.get_weights()
 
 # ======================== Split helpers ========================
@@ -258,7 +251,7 @@ def pull_task():
         # Mark as claimed and build the payload
         TASK_STATUS[cid]["status"] = "claimed"
         TASK_STATUS[cid]["start"]  = time.perf_counter()
-        weights_b64 = weights_to_b64(GLOBAL_WEIGHTS)
+        weights_b64 = fl_core.weights_to_b64(GLOBAL_WEIGHTS)
 
         shard_b64, n_samples = SHARD_PAYLOADS[cid]
 
@@ -286,7 +279,7 @@ def submit_update():
     if not all([cid, weights_b64]) or rnd is None:
         return jsonify({"ok": False, "error": "missing fields"}), 400
 
-    updated_weights = weights_from_b64(weights_b64)
+    updated_weights = fl_core.weights_from_b64(weights_b64)
 
     with LOCK:
         if rnd != ROUND_NUM:
@@ -306,12 +299,12 @@ def submit_update():
 
 
 # ======================== Server local training ========================
-def _server_train_on_shard(start_weights, X, y, epochs=1, batch=BATCH_SIZE):
+def _server_train_on_shard(start_weights, X, y, epochs=1, batch=LOCAL_BATCH):
     """
     Server trains on its own shard like a client, then reports back into CLIENT_UPDATES.
     """
     m = _build_global_model()
-    prime_model(m)
+    fl_core.prime_model(m)
     m.set_weights(start_weights)
 
     t0 = time.perf_counter()
@@ -348,14 +341,14 @@ def _run_one_time_calibration(participants: List[str]) -> None:
         for pid in participants:
             idxs = parts[pid]
             Xp, yp = X_train_all[idxs], y_train_all[idxs]
-            SHARD_PAYLOADS[pid] = (arrays_to_b64(Xp, yp), int(Xp.shape[0]))
+            SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp), int(Xp.shape[0]))
             TASK_STATUS[pid]    = {"status": "pending", "n": int(Xp.shape[0])}
         ROUND_IS_OPEN = True
         ROUND_NUM = 0  # log as round 0
 
     # Server can participate in calibration too
     if SERVER_DOES_TRAIN:
-        Xs, ys = arrays_from_b64(SHARD_PAYLOADS["server"][0])
+        Xs, ys = fl_core.arrays_from_b64(SHARD_PAYLOADS["server"][0])
         with LOCK:
             TASK_STATUS["server"]["status"] = "claimed"
             TASK_STATUS["server"]["start"]  = time.perf_counter()
@@ -393,7 +386,7 @@ def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
     global SERVER_VELOCITY, GLOBAL_WEIGHTS
 
     # Plain FedAvg first (this gives us the averaged weights)
-    avg = fedavg_weighted_average(updates)  # <-- swap this with CUDA C++ version later
+    avg = fl_core.fedavg_weighted_average(updates)  # <-- swap this with CUDA C++ version later
 
     return avg
 
@@ -461,7 +454,7 @@ def run_rounds():
                 for pid in participants:
                     idxs = STICKY_SPLITS[pid]
                     Xp, yp = X_train_all[idxs], y_train_all[idxs]
-                    SHARD_PAYLOADS[pid] = (arrays_to_b64(Xp, yp), int(Xp.shape[0]))
+                    SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp), int(Xp.shape[0]))
                     TASK_STATUS[pid]    = {"status": "pending", "n": int(Xp.shape[0])}
                 ROUND_IS_OPEN = True
                 start_weights_this_round = GLOBAL_WEIGHTS
@@ -474,7 +467,7 @@ def run_rounds():
                 for pid in participants:
                     idxs = splits_now[pid]
                     Xp, yp = X_train_all[idxs], y_train_all[idxs]
-                    SHARD_PAYLOADS[pid] = (arrays_to_b64(Xp, yp), int(Xp.shape[0]))
+                    SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp), int(Xp.shape[0]))
                     TASK_STATUS[pid]    = {"status": "pending", "n": int(Xp.shape[0])}
                 ROUND_IS_OPEN = True
                 start_weights_this_round = GLOBAL_WEIGHTS
@@ -484,7 +477,7 @@ def run_rounds():
 
         # 2) Server trains on its own shard (if enabled)
         if SERVER_DOES_TRAIN:
-            Xs, ys = arrays_from_b64(SHARD_PAYLOADS["server"][0])
+            Xs, ys = fl_core.arrays_from_b64(SHARD_PAYLOADS["server"][0])
             with LOCK:
                 TASK_STATUS["server"]["status"] = "claimed"
                 TASK_STATUS["server"]["start"]  = time.perf_counter()
@@ -524,7 +517,7 @@ def run_rounds():
 
     # Final evaluation (same held-out test split as centralized)
     total_s = time.perf_counter() - t_total
-    m = _build_global_model(); prime_model(m); m.set_weights(GLOBAL_WEIGHTS)
+    m = _build_global_model(); fl_core.prime_model(m); m.set_weights(GLOBAL_WEIGHTS)
     loss, acc = m.evaluate(X_test, y_test, verbose=0)
     print(f"\n[SRV] done | rounds={TOTAL_ROUNDS} | total={total_s/60:.2f} min | acc={acc:.4f}")
 

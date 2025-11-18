@@ -14,7 +14,7 @@ import warnings
 from time import perf_counter
 from concurrent.futures import ProcessPoolExecutor
 from typing import List, Tuple
-
+import fl_core
 import numpy as np
 
 
@@ -25,21 +25,13 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")   # keep GPU free; we’ll u
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")    # silence TF info/warn logs
 warnings.filterwarnings("ignore", message="Argument `input_length` is deprecated", category=UserWarning)
 
-# We reuse the same data prep and model as the centralized baseline.
-from Centralized_LSTM import (
-    load_dataset,
-    prepare_data,
-    build_lstm_model,
-    DATA_PATH,
-    MAX_NB_WORDS,
-    MAX_SEQ_LENGTH,
-)
+
 
 # ============================
 # Basic configuration
 # ============================
 num_clients = 4                 # number of simulated clients (processes)
-num_rounds = 20                 # how many FL rounds to run
+num_rounds = 16                 # how many FL rounds to run
 local_epochs = 1                # epochs per client per round
 local_batch = 64                # batch size per client
 reshuffle_each_round = False     # re-split data every round to keep shards fresh
@@ -64,7 +56,7 @@ print(f"[FL] CPU cores={cpu_cores} | clients={num_clients} | threads/worker: int
 # Small helpers (main process)
 # ============================
 
-def warm_up_once(model, seq_len: int = MAX_SEQ_LENGTH):
+def warm_up_once(model, seq_len: int = fl_core.MAX_SEQ_LENGTH):
     """
     We run one forward pass to allocate variables.
     This makes set_weights/get_weights safe on the model.
@@ -76,12 +68,7 @@ def build_global_model(num_classes: int):
     """
     We build the SAME LSTM as our centralized baseline, then warm it once.
     """
-    m = build_lstm_model(
-        max_words=MAX_NB_WORDS,
-        embedding_dim=100,
-        input_length=MAX_SEQ_LENGTH,
-        num_classes=num_classes,
-    )
+    m = fl_core.build_model(num_classes)
     warm_up_once(m)
     return m
 
@@ -131,12 +118,7 @@ def worker_startup(num_classes: int, intra_threads: int, inter_threads: int):
     global _worker_model, _worker_num_classes
     _worker_num_classes = int(num_classes)
 
-    _worker_model = build_lstm_model(
-        max_words=MAX_NB_WORDS,
-        embedding_dim=100,
-        input_length=MAX_SEQ_LENGTH,
-        num_classes=_worker_num_classes,
-    )
+    _worker_model = fl_core.build_model(num_classes)
     warm_up_once(_worker_model)
 
     # Compile once; we can recompile each round to reset the optimizer if desired.
@@ -245,8 +227,7 @@ def run_fl():
     # 1) Load + prep data once (tokenize, pad, split, label encode).
     print("[FL] Loading and preparing data...")
     t_prep_start = perf_counter()
-    df = load_dataset(DATA_PATH)
-    X_train, X_test, y_train, y_test, num_classes, tokenizer, label_encoder = prepare_data(df)
+    X_train, X_test, y_train, y_test, num_classes = fl_core.load_data()
     prep_sec = perf_counter() - t_prep_start
     print(f"[FL] Data ready | prep={prep_sec:.2f}s | train_n={X_train.shape[0]} | test_n={X_test.shape[0]}")
 

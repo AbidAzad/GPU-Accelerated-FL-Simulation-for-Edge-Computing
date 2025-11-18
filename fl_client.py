@@ -14,10 +14,7 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-from fl_core import (
-    MAX_NB_WORDS, MAX_SEQ_LENGTH, EMBEDDING_DIM, BATCH_SIZE,
-    build_lstm_model, prime_model, arrays_from_b64, weights_from_b64, weights_to_b64,
-)
+import fl_core
 
 # Point to our server
 SERVER_URL = "SERVER_URL"                       # <-- set server IP/port
@@ -64,7 +61,7 @@ def main():
         # Extract task info
         rnd            = resp["round"]
         n_rows_to_train= int(resp["n_samples"])
-        global_weights = weights_from_b64(resp["weights_b64"])
+        global_weights = fl_core.weights_from_b64(resp["weights_b64"])
 
         # Either decode fresh shard or reuse our cached one (sticky modes with caching)
         if resp.get("shard_b64") is None:
@@ -74,14 +71,14 @@ def main():
                 time.sleep(0.5); continue
             X, y = cached_X, cached_y
         else:
-            X, y = arrays_from_b64(resp["shard_b64"])
+            X, y = fl_core.arrays_from_b64(resp["shard_b64"])
             cached_X, cached_y = X, y  # save for later rounds if server uses caching
 
         # Build the local model once (identical architecture to centralized)
         if model is None:
             num_classes = y.shape[1]
-            model = build_lstm_model(MAX_NB_WORDS, EMBEDDING_DIM, MAX_SEQ_LENGTH, num_classes)
-            prime_model(model)
+            model = fl_core.build_model(num_classes)
+            fl_core.prime_model(model)
 
         # Load the current global weights for this round
         model.set_weights(global_weights)
@@ -93,7 +90,7 @@ def main():
         train_s = time.perf_counter() - t0
 
         # Send updated weights back to the server
-        upd = weights_to_b64(model.get_weights())
+        upd = fl_core.weights_to_b64(model.get_weights())
         try:
             requests.post(
                 f"{SERVER_URL}/submit_update",
