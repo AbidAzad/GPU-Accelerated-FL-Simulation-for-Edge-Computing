@@ -17,8 +17,10 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 import fl_core
 
 # Point to our server
-SERVER_URL = "SERVER_URL"                       # <-- set server IP/port
-CLIENT_ID  = "ADD NAME HERE"                    # <-- unique per device
+# SERVER_URL = "SERVER_URL"                       # <-- set server IP/port
+SERVER_URL = os.getenv("FL_SERVER_URL", "http://127.0.0.1:5000")
+# CLIENT_ID  = "ADD NAME HERE"                    # <-- unique per device
+CLIENT_ID  = os.getenv("CLIENT_ID", "client1")
 
 # Small knobs for this client
 LOCAL_EPOCHS = 1

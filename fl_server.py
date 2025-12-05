@@ -14,7 +14,7 @@
 #   - "adaptive_each_round" : re-size and reshuffle every round from measured speed (closer to classic adaptive).
 #
 
-from __future__ import annotations
+# from __future__ import annotations
 
 import os, logging, time, threading
 from typing import Dict, List, Tuple, Optional
@@ -32,7 +32,7 @@ import fl_core
 app = Flask(__name__)
 
 # ======================== Config (one place) ========================
-TOTAL_ROUNDS: int = 16
+TOTAL_ROUNDS: int = 3
 LOCAL_EPOCHS: int = 1
 LOCAL_BATCH:  int = 64
 
@@ -41,7 +41,7 @@ LOCAL_BATCH:  int = 64
 SPLIT_MODE: str = "sticky_calibrated"
 
 # Minimal number of connected remote clients to start
-MIN_CLIENTS: int = 2
+MIN_CLIENTS: int = 4
 
 # Warm-up (only for "sticky_calibrated")
 CALIB_SAMPLES_PER_HOST: int = 4000
@@ -62,6 +62,9 @@ SERVER_DOES_TRAIN: bool = True
 #   "fedavg"  : plain FedAvg
 AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9
+
+# Whether to use GPU-based aggregator (CUDA) instead of pure CPU
+USE_GPU_AGG: bool = False
 
 
 # ======================== Global in-memory state ========================
@@ -379,16 +382,38 @@ def _run_one_time_calibration(participants: List[str]) -> None:
 # ======================== Aggregation (swap to CUDA here later) ========================
 def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
     """
-    Aggregator switch:
-      - "fedavg"  : plain FedAvg
-    This is exactly where we will plug in the CUDA C++ aggregator later.
+    Aggregate client updates into a new set of global weights.
+
+    Args:
+        updates: List of (weights_list, n_samples) from all participants this round.
+
+    Current behavior:
+        - Always performs plain FedAvg (no momentum).
+        - FedAvg can be computed on CPU (NumPy) or GPU (CUDA) depending on USE_GPU_AGG.
+
+    This is exactly where a CUDA C++ aggregator slots in via fl_core.
     """
-    global SERVER_VELOCITY, GLOBAL_WEIGHTS
+    if not updates:
+        raise ValueError("No client updates provided to _aggregate()")
 
-    # Plain FedAvg first (this gives us the averaged weights)
-    avg = fl_core.fedavg_weighted_average(updates)  # <-- swap this with CUDA C++ version later
+    # ---------- Step 1: choose backend for FedAvg (CPU vs GPU) ----------
+    if USE_GPU_AGG:
+        # GPU implementation (to be provided in fl_core)
+        # Expected to have the same return format as the CPU version:
+        #   List[np.ndarray], one array per layer.
+        fedavg_weights = fl_core.fedavg_weighted_average_gpu(updates)
+    else:
+        # Pure NumPy implementation (already exists in fl_core)
+        fedavg_weights = fl_core.fedavg_weighted_average(updates)
 
-    return avg
+    # ---------- Step 2: algorithm choice (currently only plain FedAvg) ----------
+    if AGG_MODE == "fedavg":
+        # Plain FedAvg: just return the averaged weights
+        return fedavg_weights
+    else:
+        # Placeholder: you can later support "fedavgm" or other modes here.
+        raise ValueError(f"Unknown AGG_MODE: {AGG_MODE}")
+
 
 
 # ======================== Orchestration loop ========================
