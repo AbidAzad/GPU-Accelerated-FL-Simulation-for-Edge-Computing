@@ -6,7 +6,7 @@
 #   - Post back updated weights + sample count.
 #   - Repeat until server says "done".
 
-from __future__ import annotations
+# from __future__ import annotations
 
 import os, logging, time, requests, numpy as np
 # Force CPU + keep logs down for a quieter console
