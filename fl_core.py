@@ -217,22 +217,13 @@ def fedavg_weighted_average_gpu(
     client_updates: List[Tuple[List[np.ndarray], int]]
 ) -> List[np.ndarray]:
     """
-    GPU-oriented FedAvg wrapper (currently using NumPy on CPU).
-
-    This function reorganizes the client updates into a single flattened
-    parameter vector per client, so that a CUDA kernel can later operate on a
-    simple 2D buffer of shape (num_clients, num_params) plus a 1D vector of
-    sample counts.
-
-    Returns:
-        List of NumPy arrays representing the averaged global weights,
-        with the same shapes and dtypes as the first client's weights.
+    GPU-oriented FedAvg wrapper.
     """
     if not client_updates:
         raise ValueError("No client updates provided to fedavg_weighted_average_gpu().")
 
-    # ----- Step 1: unpack weights and counts -----
-    # weight_lists[k] is the list of layer weights from client k
+    
+    # unpack weights and counts
     weight_lists: List[List[np.ndarray]] = [w for (w, n) in client_updates]
     counts = np.asarray([n for (w, n) in client_updates], dtype=np.int32)
     total_samples = int(np.sum(counts))
@@ -246,7 +237,7 @@ def fedavg_weighted_average_gpu(
     layer_sizes = [int(np.prod(shape)) for shape in layer_shapes]
     total_params = sum(layer_sizes)
 
-    # ----- Step 2: flatten all layers for each client into a single 1D vector -----
+    # flatten all layers for each client into a single 1D vector
     flat_list: List[np.ndarray] = []
     for weights in weight_lists:
         # Flatten each layer and concatenate: [layer1_flat, layer2_flat, ...]
@@ -264,13 +255,7 @@ def fedavg_weighted_average_gpu(
     flat_stack = np.stack(flat_list, axis=0)  
     counts_f = counts.astype(np.float32)    
 
-    # ----- Step 3: compute weighted average along the client dimension -----
-    # For now, we use NumPy on CPU:
-    #   flat_avg = sum_k ( (n_k / total_samples) * flat_stack[k, :] )
-    # coeffs = counts_f / float(total_samples)      
-    # (K,) @ (K, P) -> (P,)
-    # flat_avg = coeffs @ flat_stack         
-        # ----- Step 3: 调用 GPU 版本（ctypes + .so） -----
+    # compute weighted average along the client dimension
     lib = _load_fedavg_lib()
 
     
@@ -297,7 +282,7 @@ def fedavg_weighted_average_gpu(
     flat_avg = out  # shape: (total_params,)
 
 
-    # ----- Step 4: reshape the averaged 1D vector back into per-layer tensors -----
+    # reshape the averaged 1D vector back into per-layer tensors
     averaged_weights: List[np.ndarray] = []
     offset = 0
     for shape, size, ref_w in zip(layer_shapes, layer_sizes, ref_weights):

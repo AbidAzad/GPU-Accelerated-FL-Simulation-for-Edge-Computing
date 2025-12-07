@@ -16,21 +16,6 @@
     } while (0)
 
 /// CUDA kernel: compute weighted FedAvg for one flattened layer.
-///
-/// Arguments:
-///   d_client_weights : device pointer, shape (num_clients * vec_len)
-///                      layout: client-major, i.e. client c starts at
-///                      offset c * vec_len.
-///   d_scales         : device pointer, shape (num_clients),
-///                      where d_scales[c] = n_c / total_samples.
-///   d_out            : device pointer, shape (vec_len),
-///                      output averaged weights.
-///   num_clients      : number of participating clients K.
-///   vec_len          : length of each client's weight vector L.
-///
-/// For each index idx in [0, vec_len):
-///   out[idx] = sum_c ( d_scales[c] * d_client_weights[c * vec_len + idx] )
-///
 __global__ void fedavg_kernel(
     const float* __restrict__ d_client_weights,
     const float* __restrict__ d_scales,
@@ -54,19 +39,6 @@ __global__ void fedavg_kernel(
 }
 
 /// Host helper: run FedAvg on GPU for a single flattened layer.
-///
-/// Parameters:
-///   h_client_weights : host pointer, size (num_clients * vec_len)
-///   h_counts         : host pointer, size (num_clients)
-///   h_out            : host pointer, size (vec_len), output buffer
-///   num_clients      : number of clients (K)
-///   vec_len          : length of per-client vector (L)
-///
-/// Notes:
-///   - This function allocates temporary device buffers, launches the kernel,
-///     and copies the result back to host.
-///   - You can later optimize by reusing device buffers across layers / rounds.
-///
 extern "C" void fedavg_weighted_average_gpu(
     const float* h_client_weights,
     const int*   h_counts,
