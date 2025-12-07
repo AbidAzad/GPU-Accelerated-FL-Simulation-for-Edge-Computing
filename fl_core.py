@@ -15,6 +15,13 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
 
 
+import os, sys
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(BASE_DIR, "fedavg_gpu"))
+
+import fedavg_gpu as agg_ext 
+
+
 # ============================================================
 # GLOBAL CONFIG
 # ============================================================
@@ -223,7 +230,7 @@ def fedavg_weighted_average_gpu(
     # (K,) @ (K, P) -> (P,)
     # flat_avg = coeffs @ flat_stack         
     import fedavg_gpu as agg_ext
-    flat_avg = agg_ext.fedavg_weighted_average(flat_stack, counts)
+    flat_avg = agg_ext.fedavg_weighted_average_gpu(flat_stack, counts)
       
 
     # NOTE: replace the above two lines with a CUDA call, e.g.:
