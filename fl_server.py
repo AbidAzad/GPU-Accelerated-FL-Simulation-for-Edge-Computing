@@ -41,7 +41,7 @@ LOCAL_BATCH:  int = 64
 SPLIT_MODE: str = "sticky_calibrated"
 
 # Minimal number of connected remote clients to start
-MIN_CLIENTS: int = 2
+MIN_CLIENTS: int = 4
 
 # Warm-up (only for "sticky_calibrated")
 CALIB_SAMPLES_PER_HOST: int = 4000
