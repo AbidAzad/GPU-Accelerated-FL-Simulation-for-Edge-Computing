@@ -6,7 +6,7 @@
 #   - Post back updated weights + sample count.
 #   - Repeat until server says "done".
 
-from __future__ import annotations
+# flfrom __future__ import annotations
 
 import os, logging, time, requests, numpy as np
 # Force CPU + keep logs down for a quieter console
@@ -17,8 +17,10 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 import fl_core
 
 # Point to our server
-SERVER_URL = "SERVER_URL"                       # <-- set server IP/port
-CLIENT_ID  = "ADD NAME HERE"                    # <-- unique per device
+# SERVER_URL = "SERVER_URL"                       # <-- set server IP/port
+SERVER_URL = os.getenv("FL_SERVER_URL", "http://127.0.0.1:5000")
+# CLIENT_ID  = "ADD NAME HERE"                    # <-- unique per device
+CLIENT_ID  = os.getenv("CLIENT_ID", "client1")
 
 # Small knobs for this client
 LOCAL_EPOCHS = 1
@@ -46,7 +48,7 @@ def main():
     while True:
         # Ask the server for work
         try:
-            resp = requests.get(f"{SERVER_URL}/pull_task", params={"client_id": CLIENT_ID}, timeout=300).json()
+            resp = requests.get(f"{SERVER_URL}/pull_task", params={"client_id": CLIENT_ID}, timeout=30).json()
         except requests.exceptions.RequestException:
             time.sleep(0.5); continue
 

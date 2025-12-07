@@ -1,9 +1,10 @@
 # fl_core.py
-from __future__ import annotations
+# from __future__ import annotations
 import os, io, base64, re
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from typing import List, Tuple 
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -12,32 +13,72 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
-import tensorflow as tf
+
+
+import os, sys
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(BASE_DIR, "fedavg_gpu"))
+
+import fedavg_gpu as agg_ext 
+
+import ctypes
+import os
+import numpy as np
+
+_fedavg_lib = None
+
+def _load_fedavg_lib():
+    global _fedavg_lib
+    if _fedavg_lib is not None:
+        return _fedavg_lib
+
+    #   fl_core.py
+    #   fedavg_gpu/libfedavg_gpu.so
+    here = os.path.dirname(os.path.abspath(__file__))
+    lib_path = os.path.join(here, "fedavg_gpu", "libfedavg_gpu.so")
+
+    if not os.path.isfile(lib_path):
+        raise RuntimeError("libfedavg_gpu.so not found at: {}".format(lib_path))
+
+    lib = ctypes.cdll.LoadLibrary(lib_path)
+
+
+    # extern "C" void fedavg_weighted_average_gpu(
+    #     const float* h_client_weights,
+    #     const int*   h_counts,
+    #     float*       h_out,
+    #     int          num_clients,
+    #     int          vec_len);
+    lib.fedavg_weighted_average_gpu.argtypes = [
+        ctypes.POINTER(ctypes.c_float),  # h_client_weights
+        ctypes.POINTER(ctypes.c_int),    # h_counts
+        ctypes.POINTER(ctypes.c_float),  # h_out
+        ctypes.c_int,                    # num_clients
+        ctypes.c_int,                    # vec_len
+    ]
+    lib.fedavg_weighted_average_gpu.restype = None
+
+    _fedavg_lib = lib
+    return lib
+
 
 
 # ============================================================
 # GLOBAL CONFIG
 # ============================================================
 
-# Switches (server & clients all see the same import)
-MODEL_TYPE   = "lstm"                       # options: "lstm", "cifar_resnet"
-DATASET_TYPE = "cyber_threat"                # options: "cyber_threat", "cifar10"
+MODEL_TYPE   = "lstm"           # options: "lstm" only
+DATASET_TYPE = "cyber_threat"   # options: "cyber_threat" only
 
-# Text model / dataset parameters (LSTM + cyber-threat)
+# Global parameters (client/server can override)
 MAX_NB_WORDS   = 50000
 EMBEDDING_DIM  = 100
 MAX_SEQ_LENGTH = 450
 TEST_SIZE      = 0.2
 
-# Base directory and dataset paths
-BASE_DIR      = Path(__file__).resolve().parent
+# Path to dataset
+BASE_DIR = Path(__file__).resolve().parent
 CYBER_DF_PATH = BASE_DIR / "CyberThreatModel" / "CyberThreatDataset" / "cyber-threat-intelligence_all.csv"
-
-# CIFAR-10 local archive (created separately by Centralized_CIFAR.py)
-CIFAR_DIR           = BASE_DIR / "CIFAR-10" / "CIFAR-10-Dataset"
-CIFAR_PATH          = CIFAR_DIR / "cifar10.npz"
-CIFAR_INPUT_SHAPE   = (32, 32, 3)
-CIFAR_LEARNING_RATE = 1e-3
 
 
 # ============================================================
@@ -52,8 +93,6 @@ def build_model(num_classes: int):
 
     if MODEL_TYPE == "lstm":
         return _build_lstm(num_classes)
-    if MODEL_TYPE == "cifar_resnet":
-        return _build_cifar_resnet(num_classes)
 
     # For future:
     # elif MODEL_TYPE == "othermodel":
@@ -68,36 +107,7 @@ def _build_lstm(num_classes: int):
     model.add(LSTM(150, dropout=0.2, recurrent_dropout=0.2))
     model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation="softmax"))
-    model.compile(loss="categorical_crossentropy",
-                  optimizer="adam",
-                  metrics=["accuracy"])
-    return model
-
-
-def _build_cifar_resnet(num_classes: int):
-    """
-    ResNet-50 classifier for CIFAR-10 used in FL mode.
-    """
-    inputs = tf.keras.Input(shape=CIFAR_INPUT_SHAPE)
-    base = tf.keras.applications.ResNet50(
-        include_top=False,
-        weights=None,           
-        input_tensor=inputs,
-    )
-
-    x = tf.keras.layers.GlobalAveragePooling2D(name="global_avg_pool")(base.output)
-    x = tf.keras.layers.Dense(512, activation="relu")(x)
-    x = tf.keras.layers.Dropout(0.5)(x)
-    outputs = tf.keras.layers.Dense(num_classes, activation="softmax")(x)
-
-    model = tf.keras.Model(inputs=inputs,
-                           outputs=outputs,
-                           name="ResNet50_CIFAR10")
-
-    optimizer = tf.keras.optimizers.Adam(learning_rate=CIFAR_LEARNING_RATE)
-    model.compile(optimizer=optimizer,
-                  loss="categorical_crossentropy",
-                  metrics=["accuracy"])
+    model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
     return model
 
 
@@ -115,9 +125,6 @@ def load_data():
         df = _load_cti_dataset(CYBER_DF_PATH)
         return _prepare_text_dataset(df)
 
-    if DATASET_TYPE == "cifar10":
-        return _load_cifar10_dataset(CIFAR_PATH)
-
     # Future dataset:
     # elif DATASET_TYPE == "my_other_dataset":
     #     df = pd.read_csv(OTHER_PATH)
@@ -125,8 +132,6 @@ def load_data():
 
     raise ValueError(f"Unknown DATASET_TYPE: {DATASET_TYPE}")
 
-
-# ---------- cyber-threat text dataset ----------
 
 def _load_cti_dataset(path: Path):
     df = pd.read_csv(path)
@@ -136,8 +141,7 @@ def _load_cti_dataset(path: Path):
 
 
 def _clean(s: str) -> str:
-    if not isinstance(s, str):
-        return ""
+    if not isinstance(s, str): return ""
     s = s.lower()
     s = re.sub(r"[^a-z0-9\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
@@ -166,37 +170,6 @@ def _prepare_text_dataset(df: pd.DataFrame):
     return X_train, X_test, y_train, y_test, num_classes
 
 
-# ---------- CIFAR-10 image dataset ----------
-
-def _load_cifar10_dataset(path: Path):
-    """
-    Load CIFAR-10 from a local npz (created by Centralized_CIFAR.py).
-
-    The archive is expected to contain x_train, y_train, x_test, y_test
-    arrays in the original keras.datasets.cifar10 format.
-    """
-    if not path.exists():
-        raise FileNotFoundError(
-            f"CIFAR-10 archive not found at {path}. "
-            "Run Centralized_CIFAR.py once to download and save cifar10.npz, "
-            "or update CIFAR_PATH if it's stored elsewhere."
-        )
-
-    data = np.load(path)
-    x_train = data["x_train"].astype("float32") / 255.0
-    x_test  = data["x_test"].astype("float32") / 255.0
-
-    # y_* are shape (N, 1) in the original dataset; flatten them
-    y_train_int = data["y_train"].reshape(-1)
-    y_test_int  = data["y_test"].reshape(-1)
-
-    num_classes = int(max(y_train_int.max(), y_test_int.max()) + 1)
-    y_train = to_categorical(y_train_int, num_classes)
-    y_test  = to_categorical(y_test_int, num_classes)
-
-    return x_train, x_test, y_train, y_test, num_classes
-
-
 # ============================================================
 # SERIALIZATION HELPERS
 # ============================================================
@@ -206,26 +179,22 @@ def weights_to_b64(weights):
     np.savez_compressed(buf, *weights)
     return base64.b64encode(buf.getvalue()).decode()
 
-
 def weights_from_b64(s):
     data = base64.b64decode(s.encode())
     buf = io.BytesIO(data)
     npz = np.load(buf)
     return [npz[k] for k in npz]
 
-
 def arrays_to_b64(*arrays):
     buf = io.BytesIO()
     np.savez_compressed(buf, *arrays)
     return base64.b64encode(buf.getvalue()).decode()
-
 
 def arrays_from_b64(s):
     data = base64.b64decode(s.encode())
     buf = io.BytesIO(data)
     npz = np.load(buf)
     return [npz[k] for k in npz]
-
 
 def fedavg_weighted_average(client_updates):
     weight_lists = [w for (w, n) in client_updates]
@@ -244,24 +213,97 @@ def fedavg_weighted_average(client_updates):
     return out
 
 
+def fedavg_weighted_average_gpu(
+    client_updates: List[Tuple[List[np.ndarray], int]]
+) -> List[np.ndarray]:
+    """
+    GPU-oriented FedAvg wrapper.
+    """
+    if not client_updates:
+        raise ValueError("No client updates provided to fedavg_weighted_average_gpu().")
+
+    
+    # unpack weights and counts
+    weight_lists: List[List[np.ndarray]] = [w for (w, n) in client_updates]
+    counts = np.asarray([n for (w, n) in client_updates], dtype=np.int32)
+    total_samples = int(np.sum(counts))
+
+    if total_samples == 0:
+        raise ValueError("Total number of samples is zero in fedavg_weighted_average_gpu().")
+
+    # Use the first client's weights as a reference for layer shapes and dtypes.
+    ref_weights: List[np.ndarray] = weight_lists[0]
+    layer_shapes = [w.shape for w in ref_weights]
+    layer_sizes = [int(np.prod(shape)) for shape in layer_shapes]
+    total_params = sum(layer_sizes)
+
+    # flatten all layers for each client into a single 1D vector
+    flat_list: List[np.ndarray] = []
+    for weights in weight_lists:
+        # Flatten each layer and concatenate: [layer1_flat, layer2_flat, ...]
+        flat_client = np.concatenate(
+            [w.reshape(-1) for w in weights],
+            axis=0
+        ).astype(np.float32)
+
+        if flat_client.size != total_params:
+            raise ValueError("All clients must share the same total parameter count.")
+
+        flat_list.append(flat_client)
+
+    # Shape: (num_clients, total_params)
+    flat_stack = np.stack(flat_list, axis=0)  
+    counts_f = counts.astype(np.float32)    
+
+    # compute weighted average along the client dimension
+    lib = _load_fedavg_lib()
+
+    
+    flat_stack = np.ascontiguousarray(flat_stack, dtype=np.float32)
+    counts     = np.ascontiguousarray(counts, dtype=np.int32)
+
+    num_clients, total_params = flat_stack.shape
+
+
+    out = np.empty(total_params, dtype=np.float32)
+
+    ptr_weights = flat_stack.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    ptr_counts  = counts.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+    ptr_out     = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
+    lib.fedavg_weighted_average_gpu(
+        ptr_weights,
+        ptr_counts,
+        ptr_out,
+        ctypes.c_int(num_clients),
+        ctypes.c_int(total_params),
+    )
+
+    flat_avg = out  # shape: (total_params,)
+
+
+    # reshape the averaged 1D vector back into per-layer tensors
+    averaged_weights: List[np.ndarray] = []
+    offset = 0
+    for shape, size, ref_w in zip(layer_shapes, layer_sizes, ref_weights):
+        chunk = flat_avg[offset:offset + size]
+        averaged_weights.append(chunk.reshape(shape).astype(ref_w.dtype))
+        offset += size
+
+    return averaged_weights
+
+
 def prime_model(model, seq_len: int = MAX_SEQ_LENGTH):
     """
-    Run one dummy forward pass so Keras creates all weights.
-
+    Run a single dummy forward pass so Keras creates all weights.
     This makes set_weights/get_weights safe immediately after build_model().
     """
 
     if MODEL_TYPE == "lstm":
-        # Dummy batch of one text sequence with the correct length
+        # Create a dummy batch of one sequence with the correct length
         dummy_input = np.zeros((1, seq_len), dtype="int32")
+        # Call the model once (no training) to initialize weights
         _ = model(dummy_input, training=False)
         return model
-
-    if MODEL_TYPE == "cifar_resnet":
-        # Dummy batch of one CIFAR-10 image
-        dummy_input = np.zeros((1,) + CIFAR_INPUT_SHAPE, dtype="float32")
-        _ = model(dummy_input, training=False)
+    else:
         return model
-
-    # Fallback: just return the model without priming
-    return model

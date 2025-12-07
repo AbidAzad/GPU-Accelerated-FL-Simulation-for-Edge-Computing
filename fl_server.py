@@ -14,7 +14,7 @@
 #   - "adaptive_each_round" : re-size and reshuffle every round from measured speed (closer to classic adaptive).
 #
 
-from __future__ import annotations
+# from __future__ import annotations
 
 import os, logging, time, threading
 from typing import Dict, List, Tuple, Optional
@@ -32,7 +32,7 @@ import fl_core
 app = Flask(__name__)
 
 # ======================== Config (one place) ========================
-TOTAL_ROUNDS: int = 30
+TOTAL_ROUNDS: int = 3
 LOCAL_EPOCHS: int = 1
 LOCAL_BATCH:  int = 64
 
@@ -41,7 +41,7 @@ LOCAL_BATCH:  int = 64
 SPLIT_MODE: str = "sticky_calibrated"
 
 # Minimal number of connected remote clients to start
-MIN_CLIENTS: int = 2
+MIN_CLIENTS: int = 4
 
 # Warm-up (only for "sticky_calibrated")
 CALIB_SAMPLES_PER_HOST: int = 4000
@@ -63,12 +63,8 @@ SERVER_DOES_TRAIN: bool = True
 AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9
 
-# ---------------- Early stopping (server-side) ----------------
-EARLY_STOP_ENABLED: bool   = True    # flip to False to disable
-EARLY_STOP_PATIENCE: int   = 5       # rounds with no improvement before stopping
-EARLY_STOP_MIN_DELTA: float = 1e-3   # required improvement to reset patience
-EARLY_STOP_MONITOR: str    = "acc"   # "acc" or "loss"
-EARLY_STOP_MODE: str       = "max"   # "max" for acc, "min" for loss
+# Whether to use GPU-based aggregator (CUDA) instead of pure CPU
+USE_GPU_AGG: bool = True
 
 
 # ======================== Global in-memory state ========================
@@ -369,7 +365,8 @@ def _run_one_time_calibration(participants: List[str]) -> None:
     while True:
         with LOCK:
             done = sum(1 for s in TASK_STATUS.values() if s["status"] == "done")
-            need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+            # need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+            need = len(TASK_STATUS)
         if done >= need:
             break
         time.sleep(0.2)
@@ -386,16 +383,26 @@ def _run_one_time_calibration(participants: List[str]) -> None:
 # ======================== Aggregation (swap to CUDA here later) ========================
 def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
     """
-    Aggregator switch:
-      - "fedavg"  : plain FedAvg
-    This is exactly where we will plug in the CUDA C++ aggregator later.
+    Aggregate client updates into a new set of global weights.
     """
-    global SERVER_VELOCITY, GLOBAL_WEIGHTS
+    if not updates:
+        raise ValueError("No client updates provided to _aggregate()")
 
-    # Plain FedAvg first (this gives us the averaged weights)
-    avg = fl_core.fedavg_weighted_average(updates)  # <-- swap this with CUDA C++ version later
+    # Choose backend for FedAvg (CPU vs GPU)
+    if USE_GPU_AGG:
+        # GPU implementation 
+        fedavg_weights = fl_core.fedavg_weighted_average_gpu(updates)
+    else:
+        # Pure NumPy implementation (CPU)
+        fedavg_weights = fl_core.fedavg_weighted_average(updates)
 
-    return avg
+    # Algorithm choice 
+    if AGG_MODE == "fedavg":
+        # Plain FedAvg: just return the averaged weights
+        return fedavg_weights
+    else:
+        raise ValueError(f"Unknown AGG_MODE: {AGG_MODE}")
+
 
 
 # ======================== Orchestration loop ========================
@@ -445,14 +452,6 @@ def run_rounds():
         print("[SRV] sticky shard sizes: " + " | ".join(f"{p}: {STICKY_SPLITS[p].size}" for p in participants))
 
     t_total = time.perf_counter()
-    total_train_s = 0.0   # sum of per-round training times (server+clients+agg, no eval)
-    total_eval_s  = 0.0   # sum of per-round eval times (+ final eval at the end)
-
-    # Early stopping tracking
-    best_metric: Optional[float] = None
-    best_round: int = 0
-    best_weights: Optional[List[np.ndarray]] = None
-    rounds_without_improve: int = 0
 
     # --- Main FL loop ---
     for r in range(TOTAL_ROUNDS):
@@ -487,8 +486,6 @@ def run_rounds():
                 ROUND_IS_OPEN = True
                 start_weights_this_round = GLOBAL_WEIGHTS
 
-        # Round timing starts here:
-        # includes: server+clients training + waiting + aggregation, but NOT evaluation.
         round_t0 = time.perf_counter()
         print(f"\n[SRV][R{ROUND_NUM}] start")
 
@@ -504,11 +501,12 @@ def run_rounds():
                 daemon=True
             ).start()
 
-        # 3) Wait for all participants of this round to finish training
+        # 3) Wait for all participants of this round
         while True:
             with LOCK:
                 done = sum(1 for s in TASK_STATUS.values() if s["status"] == "done")
-                need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+                # need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+                need = len(TASK_STATUS)
             if done >= need:
                 break
             time.sleep(0.2)
@@ -520,111 +518,23 @@ def run_rounds():
             new_weights  = _aggregate(updates_list)  # <-- CUDA aggregator will replace this
             GLOBAL_WEIGHTS = new_weights
             ROUND_IS_OPEN  = False
-            summary = " | ".join(
-                f"{cid}:n={st['n']},t={st.get('train_s', 0):.2f}s"
-                for cid, st in TASK_STATUS.items()
-            )
+            summary = " | ".join(f"{cid}:n={st['n']},t={st.get('train_s',0):.2f}s" for cid, st in TASK_STATUS.items())
         agg_s = time.perf_counter() - t_agg
 
-        # End of "training phase" timing for this round (server+clients+agg, no eval)
-        round_train_end = time.perf_counter()
-        round_train_s = round_train_end - round_t0
-        total_train_s += round_train_s
-
-        print(
-            f"[SRV][R{ROUND_NUM}] agg={agg_s:.2f}s | "
-            f"train_round={round_train_s:.2f}s (server+clients+agg, no eval)"
-        )
+        print(f"[SRV][R{ROUND_NUM}] agg={agg_s:.2f}s | round={time.perf_counter() - round_t0:.2f}s")
         print(f"[SRV][R{ROUND_NUM}] hosts {{ {summary} }}")
 
-        # 5) Refresh speed estimates (harmless for sticky)
+        # 5) Refresh speed estimates so adaptive mode stays accurate (harmless for sticky)
         _update_speed_from_task_status()
-
-        # 6) Per-round evaluation on held-out test set (timed separately, NOT in train_round)
-        eval_t0 = time.perf_counter()
-        eval_model = _build_global_model()
-        fl_core.prime_model(eval_model)
-        eval_model.set_weights(GLOBAL_WEIGHTS)
-        loss, acc = eval_model.evaluate(X_test, y_test, verbose=0)
-        eval_s = time.perf_counter() - eval_t0
-        total_eval_s += eval_s
-
-        print(
-            f"[SRV][R{ROUND_NUM}] eval: loss={loss:.4f}, acc={acc:.4f}, "
-            f"eval_time={eval_s:.2f}s"
-        )
-
-        # 7) Early stopping check (server-side, based on eval metric)
-        if EARLY_STOP_ENABLED:
-            # Select metric to monitor
-            current = acc if EARLY_STOP_MONITOR == "acc" else loss
-
-            # Define improvement function
-            if EARLY_STOP_MODE == "max":
-                def improved(curr, best):
-                    return curr > best + EARLY_STOP_MIN_DELTA
-            else:  # "min"
-                def improved(curr, best):
-                    return curr < best - EARLY_STOP_MIN_DELTA
-
-            if best_metric is None:
-                # First round: initialize best
-                best_metric = current
-                best_round = ROUND_NUM
-                best_weights = [w.copy() for w in GLOBAL_WEIGHTS]
-                rounds_without_improve = 0
-                print(
-                    f"[SRV][R{ROUND_NUM}] early-stop baseline: "
-                    f"{EARLY_STOP_MONITOR}={best_metric:.4f}"
-                )
-            else:
-                if improved(current, best_metric):
-                    best_metric = current
-                    best_round = ROUND_NUM
-                    best_weights = [w.copy() for w in GLOBAL_WEIGHTS]
-                    rounds_without_improve = 0
-                    print(
-                        f"[SRV][R{ROUND_NUM}] early-stop monitor improved: "
-                        f"{EARLY_STOP_MONITOR}={best_metric:.4f}"
-                    )
-                else:
-                    rounds_without_improve += 1
-                    print(
-                        f"[SRV][R{ROUND_NUM}] no {EARLY_STOP_MONITOR} improvement "
-                        f"({rounds_without_improve}/{EARLY_STOP_PATIENCE})"
-                    )
-                    if rounds_without_improve >= EARLY_STOP_PATIENCE:
-                        print(
-                            f"[SRV] early stopping triggered at round {ROUND_NUM} "
-                            f"(best {EARLY_STOP_MONITOR}={best_metric:.4f} at R{best_round})"
-                        )
-                        # Restore best weights seen so far
-                        if best_weights is not None:
-                            GLOBAL_WEIGHTS = [w.copy() for w in best_weights]
-                        break  # break out of the main rounds loop
 
     with LOCK:
         TRAINING_IS_DONE = True
 
     # Final evaluation (same held-out test split as centralized)
-    final_eval_t0 = time.perf_counter()
-    m = _build_global_model()
-    fl_core.prime_model(m)
-    m.set_weights(GLOBAL_WEIGHTS)
+    total_s = time.perf_counter() - t_total
+    m = _build_global_model(); fl_core.prime_model(m); m.set_weights(GLOBAL_WEIGHTS)
     loss, acc = m.evaluate(X_test, y_test, verbose=0)
-    final_eval_s = time.perf_counter() - final_eval_t0
-    total_eval_s += final_eval_s
-
-    total_wall_s = time.perf_counter() - t_total
-    rounds_ran = ROUND_NUM  # last round index actually executed
-
-    print(
-        f"\n[SRV] done | rounds_run={rounds_ran} (requested={TOTAL_ROUNDS}) | "
-        f"train_total={total_train_s/60:.2f} min (all rounds: server+clients+agg, no eval) | "
-        f"eval_total={total_eval_s:.2f}s (per-round + final eval) | "
-        f"wall={total_wall_s/60:.2f} min (overall wall-clock) | "
-        f"acc={acc:.4f}"
-    )
+    print(f"\n[SRV] done | rounds={TOTAL_ROUNDS} | total={total_s/60:.2f} min | acc={acc:.4f}")
 
 
 # ======================== Entrypoint ========================
