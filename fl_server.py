@@ -64,7 +64,7 @@ AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9
 
 # Whether to use GPU-based aggregator (CUDA) instead of pure CPU
-USE_GPU_AGG: bool = False
+USE_GPU_AGG: bool = True
 
 
 # ======================== Global in-memory state ========================
