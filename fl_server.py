@@ -365,7 +365,8 @@ def _run_one_time_calibration(participants: List[str]) -> None:
     while True:
         with LOCK:
             done = sum(1 for s in TASK_STATUS.values() if s["status"] == "done")
-            need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+            # need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+            need = len(TASK_STATUS)
         if done >= need:
             break
         time.sleep(0.2)
@@ -516,7 +517,8 @@ def run_rounds():
         while True:
             with LOCK:
                 done = sum(1 for s in TASK_STATUS.values() if s["status"] == "done")
-                need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+                # need = len(TASK_STATUS) if SERVER_DOES_TRAIN else (len(TASK_STATUS) - 1)
+                need = len(TASK_STATUS)
             if done >= need:
                 break
             time.sleep(0.2)
