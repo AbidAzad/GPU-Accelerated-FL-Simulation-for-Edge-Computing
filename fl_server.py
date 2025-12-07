@@ -56,7 +56,7 @@ ALLOCATION_EXP: float = 1.0       # >1 gives more work to faster hosts
 ENABLE_CLIENT_SHARD_CACHE: bool = True
 
 # Let the server also train on a shard (acts like a local client)
-SERVER_DOES_TRAIN: bool = False
+SERVER_DOES_TRAIN: bool = True
 
 # Aggregation choice:
 #   "fedavg"  : plain FedAvg
