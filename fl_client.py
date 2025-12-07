@@ -48,7 +48,7 @@ def main():
     while True:
         # Ask the server for work
         try:
-            resp = requests.get(f"{SERVER_URL}/pull_task", params={"client_id": CLIENT_ID}, timeout=30).json()
+            resp = requests.get(f"{SERVER_URL}/pull_task", params={"client_id": CLIENT_ID}, timeout=300).json()
         except requests.exceptions.RequestException:
             time.sleep(0.5); continue
 
