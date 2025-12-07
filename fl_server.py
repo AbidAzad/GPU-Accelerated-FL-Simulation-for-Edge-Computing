@@ -41,7 +41,7 @@ LOCAL_BATCH:  int = 64
 SPLIT_MODE: str = "sticky_calibrated"
 
 # Minimal number of connected remote clients to start
-MIN_CLIENTS: int = 4
+MIN_CLIENTS: int = 2
 
 # Warm-up (only for "sticky_calibrated")
 CALIB_SAMPLES_PER_HOST: int = 4000
@@ -56,7 +56,7 @@ ALLOCATION_EXP: float = 1.0       # >1 gives more work to faster hosts
 ENABLE_CLIENT_SHARD_CACHE: bool = True
 
 # Let the server also train on a shard (acts like a local client)
-SERVER_DOES_TRAIN: bool = False
+SERVER_DOES_TRAIN: bool = True
 
 # Aggregation choice:
 #   "fedavg"  : plain FedAvg
