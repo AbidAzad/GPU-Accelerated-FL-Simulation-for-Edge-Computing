@@ -21,6 +21,47 @@ sys.path.append(os.path.join(BASE_DIR, "fedavg_gpu"))
 
 import fedavg_gpu as agg_ext 
 
+import ctypes
+import os
+import numpy as np
+
+_fedavg_lib = None
+
+def _load_fedavg_lib():
+    global _fedavg_lib
+    if _fedavg_lib is not None:
+        return _fedavg_lib
+
+    #   fl_core.py
+    #   fedavg_gpu/libfedavg_gpu.so
+    here = os.path.dirname(os.path.abspath(__file__))
+    lib_path = os.path.join(here, "fedavg_gpu", "libfedavg_gpu.so")
+
+    if not os.path.isfile(lib_path):
+        raise RuntimeError("libfedavg_gpu.so not found at: {}".format(lib_path))
+
+    lib = ctypes.cdll.LoadLibrary(lib_path)
+
+
+    # extern "C" void fedavg_weighted_average_gpu(
+    #     const float* h_client_weights,
+    #     const int*   h_counts,
+    #     float*       h_out,
+    #     int          num_clients,
+    #     int          vec_len);
+    lib.fedavg_weighted_average_gpu.argtypes = [
+        ctypes.POINTER(ctypes.c_float),  # h_client_weights
+        ctypes.POINTER(ctypes.c_int),    # h_counts
+        ctypes.POINTER(ctypes.c_float),  # h_out
+        ctypes.c_int,                    # num_clients
+        ctypes.c_int,                    # vec_len
+    ]
+    lib.fedavg_weighted_average_gpu.restype = None
+
+    _fedavg_lib = lib
+    return lib
+
+
 
 # ============================================================
 # GLOBAL CONFIG
@@ -229,13 +270,32 @@ def fedavg_weighted_average_gpu(
     # coeffs = counts_f / float(total_samples)      
     # (K,) @ (K, P) -> (P,)
     # flat_avg = coeffs @ flat_stack         
-    import fedavg_gpu as agg_ext
-    flat_avg = agg_ext.fedavg_weighted_average_gpu(flat_stack, counts)
-      
+        # ----- Step 3: 调用 GPU 版本（ctypes + .so） -----
+    lib = _load_fedavg_lib()
 
-    # NOTE: replace the above two lines with a CUDA call, e.g.:
-    #   import agg_ext
-    #   flat_avg = agg_ext.fedavg_weighted_average(flat_stack, counts)
+    
+    flat_stack = np.ascontiguousarray(flat_stack, dtype=np.float32)
+    counts     = np.ascontiguousarray(counts, dtype=np.int32)
+
+    num_clients, total_params = flat_stack.shape
+
+
+    out = np.empty(total_params, dtype=np.float32)
+
+    ptr_weights = flat_stack.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    ptr_counts  = counts.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+    ptr_out     = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
+    lib.fedavg_weighted_average_gpu(
+        ptr_weights,
+        ptr_counts,
+        ptr_out,
+        ctypes.c_int(num_clients),
+        ctypes.c_int(total_params),
+    )
+
+    flat_avg = out  # shape: (total_params,)
+
 
     # ----- Step 4: reshape the averaged 1D vector back into per-layer tensors -----
     averaged_weights: List[np.ndarray] = []
