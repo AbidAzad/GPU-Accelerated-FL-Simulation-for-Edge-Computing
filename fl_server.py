@@ -44,7 +44,7 @@ SPLIT_MODE: str = "sticky_calibrated"
 MIN_CLIENTS: int = 2
 
 # Warm-up (only for "sticky_calibrated")
-CALIB_SAMPLES_PER_HOST: int = 4000
+CALIB_SAMPLES_PER_HOST: int = 15000
 CALIB_MIN_SAMPLES: int = 512
 SPEED_EMA_BETA: float = 0.7      # smoothing after real rounds
 
