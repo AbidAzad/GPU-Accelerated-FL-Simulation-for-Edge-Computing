@@ -219,9 +219,12 @@ def fedavg_weighted_average_gpu(
     # ----- Step 3: compute weighted average along the client dimension -----
     # For now, we use NumPy on CPU:
     #   flat_avg = sum_k ( (n_k / total_samples) * flat_stack[k, :] )
-    coeffs = counts_f / float(total_samples)      
+    # coeffs = counts_f / float(total_samples)      
     # (K,) @ (K, P) -> (P,)
-    flat_avg = coeffs @ flat_stack               
+    # flat_avg = coeffs @ flat_stack         
+    import fedavg_gpu as agg_ext
+    flat_avg = agg_ext.fedavg_weighted_average(flat_stack, counts)
+      
 
     # NOTE: replace the above two lines with a CUDA call, e.g.:
     #   import agg_ext
