@@ -16,7 +16,7 @@ ext_modules = [
         library_dirs=[os.path.join(cuda_home, "lib64")],
         libraries=["cudart"],
         language="c++",
-        extra_compile_args=["-O3", "-std=c++14"],
+        extra_compile_args=["-O3", "-std=c++11"],
     )
 ]
 
