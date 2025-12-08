@@ -32,7 +32,7 @@ import fl_core
 app = Flask(__name__)
 
 # ======================== Config (one place) ========================
-TOTAL_ROUNDS: int = 3
+TOTAL_ROUNDS: int = 25
 LOCAL_EPOCHS: int = 1
 LOCAL_BATCH:  int = 64
 
