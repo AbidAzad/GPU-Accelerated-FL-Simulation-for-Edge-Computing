@@ -569,9 +569,11 @@ def _print_detailed_metrics(model, X_test, y_test, round_num):
                    'software_attack', 'threat_actor', 'identity']
 
     print(f"\n[SRV][R{round_num}] Detailed Classification Report:")
-    print(classification_report(y_true, y_pred,
-                                target_names=class_names,
-                                zero_division=0))
+    # print(classification_report(y_true, y_pred,
+    #                             target_names=class_names,
+    #                             zero_division=0))
+    print(classification_report(y_true, y_pred, zero_division=0))
+
 
     # Benign vs Malicious summary
     benign_mask = (y_true == 0)          # Assuming 'benign' is class 0
