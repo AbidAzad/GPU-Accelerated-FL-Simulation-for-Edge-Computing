@@ -22,8 +22,8 @@ import tensorflow as tf
 # ============================================================
 
 # Switches (server & clients all see the same import)
-MODEL_TYPE   = "cifar_resnet"                       # options: "lstm", "cifar_resnet"
-DATASET_TYPE = "cifar10"              # options: "cyber_threat", "cifar10"
+MODEL_TYPE   = "lstm"                       # options: "lstm", "cifar_resnet"
+DATASET_TYPE = "cyber_threat"              # options: "cyber_threat", "cifar10"
 
 # Text model / dataset parameters (LSTM + cyber-threat)
 MAX_NB_WORDS   = 50000
