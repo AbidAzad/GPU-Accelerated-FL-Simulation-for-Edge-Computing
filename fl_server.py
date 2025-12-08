@@ -559,6 +559,13 @@ def run_rounds():
             f"eval_time={eval_s:.2f}s"
         )
 
+        # Optional detailed metrics for the cyber-threat dataset every 5 rounds
+        if fl_core.DATASET_TYPE == "cyber_threat" and (ROUND_NUM % 5 == 0):
+            try:
+                fl_core.print_cyber_threat_metrics(eval_model, X_test, y_test, ROUND_NUM)
+            except Exception as e:
+                print(f"[SRV][R{ROUND_NUM}] detailed cyber metrics failed: {e}")
+
         # 7) Early stopping check (server-side, based on eval metric)
         if EARLY_STOP_ENABLED:
             current = acc if EARLY_STOP_MONITOR == "acc" else loss

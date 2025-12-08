@@ -1,4 +1,3 @@
-# fl_core.py
 from __future__ import annotations
 
 import os, io, base64, re, ctypes
@@ -45,6 +44,9 @@ CIFAR_LEARNING_RATE = 1e-3
 # Path to CUDA FedAvg shared library
 FEDAVG_LIB_PATH = BASE_DIR / "fedavg_gpu" / "libfedavg_gpu.so"
 _FEDAVG_LIB: ctypes.CDLL | None = None
+
+# Saved label names for the cyber-threat dataset (filled in _prepare_text_dataset)
+CYBER_CLASS_NAMES: List[str] | None = None
 
 
 def _load_fedavg_lib() -> ctypes.CDLL:
@@ -192,6 +194,11 @@ def _prepare_text_dataset(df: pd.DataFrame):
     # Encode labels
     enc = LabelEncoder()
     y_int = enc.fit_transform(df["label"])
+
+    # Save class names globally so the server can print nice reports later
+    global CYBER_CLASS_NAMES
+    CYBER_CLASS_NAMES = enc.classes_.tolist()
+
     num_classes = len(enc.classes_)
     y = to_categorical(y_int, num_classes)
 
@@ -400,3 +407,71 @@ def prime_model(model, seq_len: int = MAX_SEQ_LENGTH):
 
     # Fallback: just return the model without priming
     return model
+
+
+# ============================================================
+# CYBER-THREAT METRICS (SERVER USES THIS)
+# ============================================================
+
+def print_cyber_threat_metrics(model, X_test, y_test, round_num: int) -> None:
+    """
+    Print detailed classification metrics for the cyber-threat text dataset.
+
+    Assumes y_test is one-hot encoded. Uses CYBER_CLASS_NAMES (from the
+    LabelEncoder) when available, otherwise falls back to a hard-coded list.
+    Also prints a benign vs malicious summary, where benign is identified
+    by name if possible.
+    """
+    if DATASET_TYPE != "cyber_threat":
+        print(f"[SRV][R{round_num}] print_cyber_threat_metrics() skipped (DATASET_TYPE={DATASET_TYPE!r})")
+        return
+
+    from sklearn.metrics import classification_report
+
+    # Get predictions
+    y_pred_probs = model.predict(X_test, verbose=0)
+    y_pred = np.argmax(y_pred_probs, axis=1)
+    y_true = np.argmax(y_test, axis=1)
+
+    # Class names for full report
+    if CYBER_CLASS_NAMES is not None:
+        class_names = CYBER_CLASS_NAMES
+    else:
+        # Fallback based on your dataset
+        class_names = [
+            "benign",
+            "malware",
+            "attack_pattern",
+            "software_attack",
+            "threat_actor",
+            "identity",
+        ]
+
+    print(f"\n[SRV][R{round_num}] Detailed Classification Report:")
+    try:
+        print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
+    except Exception as e:
+        print(f"[SRV][R{round_num}] classification_report failed: {e}")
+
+    # Benign vs malicious summary
+    # Try to locate the 'benign' class by name; fall back to index 0.
+    if CYBER_CLASS_NAMES is not None and "benign" in CYBER_CLASS_NAMES:
+        benign_index = CYBER_CLASS_NAMES.index("benign")
+    else:
+        benign_index = 0
+
+    benign_mask = (y_true == benign_index)
+    malicious_mask = ~benign_mask
+
+    benign_acc = float(np.mean(y_pred[benign_mask] == y_true[benign_mask])) if benign_mask.any() else 0.0
+    malicious_acc = float(np.mean(y_pred[malicious_mask] == y_true[malicious_mask])) if malicious_mask.any() else 0.0
+
+    num_samples = len(y_test)
+    benign_pct = 100.0 * float(benign_mask.sum()) / num_samples if num_samples else 0.0
+    malicious_pct = 100.0 * float(malicious_mask.sum()) / num_samples if num_samples else 0.0
+
+    print(f"\n[SRV][R{round_num}] Threat Detection Summary:")
+    print(f"  Benign samples:     {benign_mask.sum()} ({benign_pct:.1f}%)")
+    print(f"  Malicious samples:  {malicious_mask.sum()} ({malicious_pct:.1f}%)")
+    print(f"  Benign accuracy:    {benign_acc * 100:.2f}%")
+    print(f"  Malicious accuracy: {malicious_acc * 100:.2f}%")
