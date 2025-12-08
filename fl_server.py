@@ -38,7 +38,7 @@ LOCAL_BATCH:  int = 64
 
 # One knob for how we split training data
 #   "sticky_calibrated" | "sticky_equal" | "adaptive_each_round"
-SPLIT_MODE: str = "sticky_calibrated
+SPLIT_MODE: str = "sticky_calibrated"
 # Minimal number of connected remote clients to start
 MIN_CLIENTS: int = 4
 
