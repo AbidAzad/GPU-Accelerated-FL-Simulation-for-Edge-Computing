@@ -536,6 +536,46 @@ def run_rounds():
     loss, acc = m.evaluate(X_test, y_test, verbose=0)
     print(f"\n[SRV] done | rounds={TOTAL_ROUNDS} | total={total_s/60:.2f} min | acc={acc:.4f}")
 
+def _print_detailed_metrics(model, X_test, y_test, round_num):
+    """Print detailed classification metrics."""
+    from sklearn.metrics import classification_report, confusion_matrix
+
+    # Get predictions
+    y_pred_probs = model.predict(X_test, verbose=0)
+    y_pred = np.argmax(y_pred_probs, axis=1)
+    y_true = np.argmax(y_test, axis=1)
+
+
+    # You'll need to save these during data loading in fl_core.py
+    # For now, hardcode based on your dataset
+    class_names = ['benign', 'malware', 'attack_pattern', 'software_attack', 'threat_actor', 'identity']
+
+    print(f"\n[SRV][R{round_num}] Detailed Classification Report:")
+    print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
+
+    # Benign vs Malicious summary
+    benign_mask = (y_true == 0)  # Assuming 'benign' is class 0
+    malicious_mask = ~benign_mask
+
+    benign_acc = np.mean(y_pred[benign_mask] == y_true[benign_mask]) if benign_mask.any() else 0
+    malicious_acc = np.mean(y_pred[malicious_mask] == y_true[malicious_mask]) if malicious_mask.any() else 0
+
+    print(f"\n[SRV][R{round_num}] Threat Detection Summary:")
+    print(f"  Benign samples:     {benign_mask.sum()} ({100benign_mask.sum()/len(y_test):.1f}%)")
+    print(f"  Malicious samples:  {malicious_mask.sum()} ({100malicious_mask.sum()/len(y_test):.1f}%)")
+    print(f"  Benign accuracy:    {100benign_acc:.2f}%")
+    print(f"  Malicious accuracy: {100malicious_acc:.2f}%")
+
+
+
+eval_model = _build_global_model()
+fl_core.prime_model(eval_model)
+eval_model.set_weights(GLOBAL_WEIGHTS)
+loss, acc = eval_model.evaluate(X_test, y_test, verbose=0)
+
+
+if ROUND_NUM % 5 == 0:  # Print detailed metrics every 5 rounds
+    _print_detailed_metrics(eval_model, X_test, y_test, ROUND_NUM)
 
 # ======================== Entrypoint ========================
 def _run_api():
