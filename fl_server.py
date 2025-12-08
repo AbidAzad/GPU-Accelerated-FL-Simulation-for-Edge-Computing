@@ -601,11 +601,3 @@ if __name__ == "__main__":
     api_thread = threading.Thread(target=_run_api, daemon=True)
     api_thread.start()
     run_rounds()
-    eval_model = _build_global_model()
-    fl_core.prime_model(eval_model)
-    eval_model.set_weights(GLOBAL_WEIGHTS)
-    loss, acc = eval_model.evaluate(X_test, y_test, verbose=0)
-
-    if ROUND_NUM % 5 == 0:  # Print detailed metrics every 5 rounds
-    _print_detailed_metrics(eval_model, X_test, y_test, ROUND_NUM)
-
