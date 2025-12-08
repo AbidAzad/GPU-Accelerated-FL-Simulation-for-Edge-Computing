@@ -1,21 +1,31 @@
-#include <cuda_runtime.h>
-#include <stdexcept>
-#include <vector>
-#include <numeric>
-#include <iostream>
+// fedavg_gpu.cu — Linux .so with loud logging and NO C++ exceptions
 
-// Simple CUDA error check macro
+#include <cuda_runtime.h>
+#include <iostream>
+#include <vector>
+#include <cstddef>
+
+// ------------------------------------------------------------------
+// Logging + safe CUDA macro (NO EXCEPTIONS)
+// ------------------------------------------------------------------
 #define CUDA_CHECK(expr)                                                      \
     do {                                                                      \
         cudaError_t _err = (expr);                                            \
         if (_err != cudaSuccess) {                                            \
-            std::cerr << "CUDA error: " << cudaGetErrorString(_err)          \
-                      << " at " << __FILE__ << ":" << __LINE__ << std::endl;  \
-            throw std::runtime_error("CUDA failure");                         \
+            std::cerr << "[fedavg_gpu] CUDA error at " << __FILE__ << ":"    \
+                      << __LINE__ << " : " << cudaGetErrorString(_err)       \
+                      << std::endl;                                          \
+            /* DO NOT THROW. Just bail out. */                               \
+            return;                                                           \
         }                                                                     \
     } while (0)
 
-/// CUDA kernel: compute weighted FedAvg for one flattened layer.
+// ------------------------------------------------------------------
+// Simple FedAvg kernel
+// d_client_weights: shape (num_clients, vec_len), row-major
+// d_scales        : shape (num_clients,) (sum to 1)
+// d_out           : shape (vec_len,)
+// ------------------------------------------------------------------
 __global__ void fedavg_kernel(
     const float* __restrict__ d_client_weights,
     const float* __restrict__ d_scales,
@@ -38,7 +48,13 @@ __global__ void fedavg_kernel(
     d_out[idx] = acc;
 }
 
-/// Host helper: run FedAvg on GPU for a single flattened layer.
+// ------------------------------------------------------------------
+// Host entry point (called from Python via ctypes)
+//
+// h_client_weights: pointer to host float array of size num_clients * vec_len
+// h_counts        : pointer to host int array of size num_clients
+// h_out           : pointer to host float array of size vec_len (output)
+// ------------------------------------------------------------------
 extern "C" void fedavg_weighted_average_gpu(
     const float* h_client_weights,
     const int*   h_counts,
@@ -46,8 +62,16 @@ extern "C" void fedavg_weighted_average_gpu(
     int          num_clients,
     int          vec_len)
 {
+    // Basic pointer / shape checks
+    if (!h_client_weights || !h_counts || !h_out) {
+        std::cerr << "[fedavg_gpu] ERROR: null pointer(s) passed in."
+                  << std::endl;
+        return;
+    }
     if (num_clients <= 0 || vec_len <= 0) {
-        throw std::invalid_argument("num_clients and vec_len must be positive");
+        std::cerr << "[fedavg_gpu] ERROR: num_clients or vec_len <= 0."
+                  << std::endl;
+        return;
     }
 
     // 1) Compute total number of samples on host
@@ -56,7 +80,9 @@ extern "C" void fedavg_weighted_average_gpu(
         total_samples += static_cast<long long>(h_counts[c]);
     }
     if (total_samples <= 0) {
-        throw std::invalid_argument("total_samples must be positive");
+        std::cerr << "[fedavg_gpu] ERROR: total_samples <= 0, aborting."
+                  << std::endl;
+        return;
     }
 
     // 2) Prepare scales on host: s_c = n_c / total_samples
@@ -72,7 +98,7 @@ extern "C" void fedavg_weighted_average_gpu(
     float* d_out            = nullptr;
 
     size_t weights_bytes = static_cast<size_t>(num_clients) *
-                            static_cast<size_t>(vec_len) * sizeof(float);
+                           static_cast<size_t>(vec_len) * sizeof(float);
     size_t scales_bytes  = static_cast<size_t>(num_clients) * sizeof(float);
     size_t out_bytes     = static_cast<size_t>(vec_len) * sizeof(float);
 
@@ -93,14 +119,21 @@ extern "C" void fedavg_weighted_average_gpu(
     fedavg_kernel<<<blocks, threads_per_block>>>(
         d_client_weights, d_scales, d_out, num_clients, vec_len
     );
-    CUDA_CHECK(cudaGetLastError());
+
+    cudaError_t launch_err = cudaGetLastError();
+    if (launch_err != cudaSuccess) {
+        std::cerr << "[fedavg_gpu] KERNEL LAUNCH ERROR: "
+                  << cudaGetErrorString(launch_err) << std::endl;
+        // 继续往下走，后面的 CUDA_CHECK(cudaDeviceSynchronize) 会 return 掉
+    }
+
     CUDA_CHECK(cudaDeviceSynchronize());
 
     // 6) Copy result back to host
     CUDA_CHECK(cudaMemcpy(h_out, d_out, out_bytes, cudaMemcpyDeviceToHost));
 
     // 7) Free device buffers
-    CUDA_CHECK(cudaFree(d_client_weights));
-    CUDA_CHECK(cudaFree(d_scales));
-    CUDA_CHECK(cudaFree(d_out));
+    cudaFree(d_client_weights);
+    cudaFree(d_scales);
+    cudaFree(d_out);
 }
