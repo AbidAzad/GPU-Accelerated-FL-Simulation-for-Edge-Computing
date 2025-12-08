@@ -20,7 +20,7 @@ import os, logging, time, threading
 from typing import Dict, List, Tuple, Optional
 
 # Force CPU + quiet logs
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+# os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
