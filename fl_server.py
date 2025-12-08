@@ -547,7 +547,7 @@ def run_rounds():
     print(f"[SRV][R{ROUND_NUM}] test loss={loss:.4f}, acc={acc:.4f}")
 
     # if ROUND_NUM % 5 == 0:
-     _print_detailed_metrics(eval_model, X_test, y_test, ROUND_NUM)
+    _print_detailed_metrics(eval_model, X_test, y_test, ROUND_NUM)
 
     # 5) Refresh speed estimates so adaptive mode stays accurate (harmless for sticky)
     _update_speed_from_task_status()
