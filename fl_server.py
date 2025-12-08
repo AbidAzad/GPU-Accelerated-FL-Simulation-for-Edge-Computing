@@ -536,33 +536,58 @@ def run_rounds():
     loss, acc = m.evaluate(X_test, y_test, verbose=0)
     print(f"\n[SRV] done | rounds={TOTAL_ROUNDS} | total={total_s/60:.2f} min | acc={acc:.4f}")
 
+    print(f"[SRV][R{ROUND_NUM}] agg={agg_s:.2f}s | round={time.perf_counter() - round_t0:.2f}s")
+    print(f"[SRV][R{ROUND_NUM}] hosts {{ {summary} }}")
+
+    #  Per-round evaluation on the held-out test set
+    eval_model = _build_global_model()
+    fl_core.prime_model(eval_model)
+    eval_model.set_weights(GLOBAL_WEIGHTS)
+    loss, acc = eval_model.evaluate(X_test, y_test, verbose=0)
+    print(f"[SRV][R{ROUND_NUM}] test loss={loss:.4f}, acc={acc:.4f}")
+
+    if ROUND_NUM % 5 == 0:
+        _print_detailed_metrics(eval_model, X_test, y_test, ROUND_NUM)
+
+    # 5) Refresh speed estimates so adaptive mode stays accurate (harmless for sticky)
+    _update_speed_from_task_status()
+
+
+
 def _print_detailed_metrics(model, X_test, y_test, round_num):
     """Print detailed classification metrics."""
-    from sklearn.metrics import classification_report, confusion_matrix
+    from sklearn.metrics import classification_report
 
     # Get predictions
     y_pred_probs = model.predict(X_test, verbose=0)
     y_pred = np.argmax(y_pred_probs, axis=1)
     y_true = np.argmax(y_test, axis=1)
 
-
     # You'll need to save these during data loading in fl_core.py
     # For now, hardcode based on your dataset
-    class_names = ['benign', 'malware', 'attack_pattern', 'software_attack', 'threat_actor', 'identity']
+    class_names = ['benign', 'malware', 'attack_pattern',
+                   'software_attack', 'threat_actor', 'identity']
 
     print(f"\n[SRV][R{round_num}] Detailed Classification Report:")
-    print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
+    print(classification_report(y_true, y_pred,
+                                target_names=class_names,
+                                zero_division=0))
 
     # Benign vs Malicious summary
-    benign_mask = (y_true == 0)  # Assuming 'benign' is class 0
+    benign_mask = (y_true == 0)          # Assuming 'benign' is class 0
     malicious_mask = ~benign_mask
 
-    benign_acc = np.mean(y_pred[benign_mask] == y_true[benign_mask]) if benign_mask.any() else 0
-    malicious_acc = np.mean(y_pred[malicious_mask] == y_true[malicious_mask]) if malicious_mask.any() else 0
+    benign_acc = (np.mean(y_pred[benign_mask] == y_true[benign_mask])
+                  if benign_mask.any() else 0.0)
+    malicious_acc = (np.mean(y_pred[malicious_mask] == y_true[malicious_mask])
+                     if malicious_mask.any() else 0.0)
 
+    total = len(y_test)
     print(f"\n[SRV][R{round_num}] Threat Detection Summary:")
-    print(f"  Benign samples:     {benign_mask.sum()} ({100 * benign_mask.sum()/len(y_test):.1f}%)")
-    print(f"  Malicious samples:  {malicious_mask.sum()} ({100 * malicious_mask.sum()/len(y_test):.1f}%)")
+    print(f"  Benign samples:     {benign_mask.sum()} "
+          f"({100 * benign_mask.sum() / total:.1f}%)")
+    print(f"  Malicious samples:  {malicious_mask.sum()} "
+          f"({100 * malicious_mask.sum() / total:.1f}%)")
     print(f"  Benign accuracy:    {100 * benign_acc:.2f}%")
     print(f"  Malicious accuracy: {100 * malicious_acc:.2f}%")
 
