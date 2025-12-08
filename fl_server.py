@@ -561,10 +561,10 @@ def _print_detailed_metrics(model, X_test, y_test, round_num):
     malicious_acc = np.mean(y_pred[malicious_mask] == y_true[malicious_mask]) if malicious_mask.any() else 0
 
     print(f"\n[SRV][R{round_num}] Threat Detection Summary:")
-    print(f"  Benign samples:     {benign_mask.sum()} ({100benign_mask.sum()/len(y_test):.1f}%)")
-    print(f"  Malicious samples:  {malicious_mask.sum()} ({100malicious_mask.sum()/len(y_test):.1f}%)")
-    print(f"  Benign accuracy:    {100benign_acc:.2f}%")
-    print(f"  Malicious accuracy: {100malicious_acc:.2f}%")
+    print(f"  Benign samples:     {benign_mask.sum()} ({100 * benign_mask.sum()/len(y_test):.1f}%)")
+    print(f"  Malicious samples:  {malicious_mask.sum()} ({100 * malicious_mask.sum()/len(y_test):.1f}%)")
+    print(f"  Benign accuracy:    {100 * benign_acc:.2f}%")
+    print(f"  Malicious accuracy: {100 * malicious_acc:.2f}%")
 
 
 if ROUND_NUM % 5 == 0:  # Print detailed metrics every 5 rounds
