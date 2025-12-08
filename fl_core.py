@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os, io, base64, re, ctypes
+import os, io, base64, re, ctypes, sys
 from pathlib import Path
 from typing import List, Tuple
 
@@ -22,8 +22,8 @@ import tensorflow as tf
 # ============================================================
 
 # Switches (server & clients all see the same import)
-MODEL_TYPE   = "lstm"                       # options: "lstm", "cifar_resnet"
-DATASET_TYPE = "cyber_threat"              # options: "cyber_threat", "cifar10"
+MODEL_TYPE   = "cifar_resnet"                       # options: "lstm", "cifar_resnet"
+DATASET_TYPE = "cifar10"              # options: "cyber_threat", "cifar10"
 
 # Text model / dataset parameters (LSTM + cyber-threat)
 MAX_NB_WORDS   = 50000
@@ -42,7 +42,11 @@ CIFAR_INPUT_SHAPE   = (32, 32, 3)
 CIFAR_LEARNING_RATE = 1e-3
 
 # Path to CUDA FedAvg shared library
-FEDAVG_LIB_PATH = BASE_DIR / "fedavg_gpu" / "libfedavg_gpu.so"
+if sys.platform.startswith("win"):
+    FEDAVG_LIB_PATH = BASE_DIR / "fedavg_gpu" / "fedavg_gpu.dll"
+else:
+    FEDAVG_LIB_PATH = BASE_DIR / "fedavg_gpu" / "libfedavg_gpu.so"
+
 _FEDAVG_LIB: ctypes.CDLL | None = None
 
 # Saved label names for the cyber-threat dataset (filled in _prepare_text_dataset)
@@ -50,27 +54,18 @@ CYBER_CLASS_NAMES: List[str] | None = None
 
 
 def _load_fedavg_lib() -> ctypes.CDLL:
-    """
-    Lazy-load the CUDA FedAvg shared library and configure its signature.
-    """
     global _FEDAVG_LIB
     if _FEDAVG_LIB is not None:
         return _FEDAVG_LIB
 
     if not FEDAVG_LIB_PATH.is_file():
         raise RuntimeError(
-            f"libfedavg_gpu.so not found at: {FEDAVG_LIB_PATH}. "
+            f"{FEDAVG_LIB_PATH.name} not found at: {FEDAVG_LIB_PATH}. "
             "Build it and place it under fedavg_gpu/ or turn off USE_GPU_AGG."
         )
 
     lib = ctypes.cdll.LoadLibrary(str(FEDAVG_LIB_PATH))
 
-    # extern "C" void fedavg_weighted_average_gpu(
-    #     const float* h_client_weights,
-    #     const int*   h_counts,
-    #     float*       h_out,
-    #     int          num_clients,
-    #     int          vec_len);
     lib.fedavg_weighted_average_gpu.argtypes = [
         ctypes.POINTER(ctypes.c_float),  # h_client_weights
         ctypes.POINTER(ctypes.c_int),    # h_counts
@@ -313,7 +308,7 @@ def fedavg_weighted_average_gpu(
     client_updates: List[Tuple[List[np.ndarray], int]]
 ) -> List[np.ndarray]:
     """
-    GPU-oriented FedAvg using libfedavg_gpu.so.
+    GPU-oriented FedAvg using fedavg_gpu.dll (.so on Linux).
     Flattens all layers into one big vector per client, calls the CUDA kernel,
     then reshapes back to the original layer shapes.
     """
@@ -336,14 +331,17 @@ def fedavg_weighted_average_gpu(
 
     # Flatten all layers for each client into one 1D vector
     flat_list: List[np.ndarray] = []
-    for weights in weight_lists:
+    for idx, weights in enumerate(weight_lists):
         flat_client = np.concatenate(
             [w.reshape(-1) for w in weights],
             axis=0
         ).astype(np.float32)
 
         if flat_client.size != total_params:
-            raise ValueError("All clients must share the same total parameter count.")
+            raise ValueError(
+                f"All clients must share the same total parameter count. "
+                f"client {idx} has {flat_client.size}, expected {total_params}"
+            )
 
         flat_list.append(flat_client)
 
@@ -352,7 +350,8 @@ def fedavg_weighted_average_gpu(
     flat_stack = np.ascontiguousarray(flat_stack, dtype=np.float32)
     counts     = np.ascontiguousarray(counts, dtype=np.int32)
 
-    num_clients, total_params = flat_stack.shape
+    num_clients, total_params_check = flat_stack.shape
+    assert total_params_check == total_params
 
     out = np.empty(total_params, dtype=np.float32)
 
@@ -381,7 +380,6 @@ def fedavg_weighted_average_gpu(
         offset += size
 
     return averaged_weights
-
 
 # ============================================================
 # MODEL PRIMING

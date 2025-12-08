@@ -15,7 +15,7 @@ import os, logging, time, threading
 from typing import Dict, List, Tuple, Optional
 
 # Force CPU for TF + quiet logs (CUDA is only used in our custom aggregator)
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+# os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
@@ -39,7 +39,7 @@ SPLIT_MODE: str = "sticky_calibrated"
 MIN_CLIENTS: int = 2
 
 # Warm-up (only for "sticky_calibrated")
-CALIB_SAMPLES_PER_HOST: int = 4000
+CALIB_SAMPLES_PER_HOST: int = 15000
 CALIB_MIN_SAMPLES: int = 512
 SPEED_EMA_BETA: float = 0.7      # smoothing after real rounds
 
@@ -59,7 +59,7 @@ AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9  # reserved for future FedAvgM / momentum variants
 
 # Whether to use GPU-based aggregator (CUDA) instead of pure CPU NumPy
-USE_GPU_AGG: bool = False  # safer default; flip to True once libfedavg_gpu.so is ready
+USE_GPU_AGG: bool = True  # safer default; flip to True once libfedavg_gpu.so is ready
 
 # ---------------- Early stopping (server-side) ----------------
 EARLY_STOP_ENABLED: bool   = True    # flip to False to disable
