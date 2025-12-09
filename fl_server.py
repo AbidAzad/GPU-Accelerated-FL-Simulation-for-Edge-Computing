@@ -27,7 +27,7 @@ import fl_core
 app = Flask(__name__)
 
 # ======================== Config (one place) ========================
-TOTAL_ROUNDS: int = 30
+TOTAL_ROUNDS: int = 100
 LOCAL_EPOCHS: int = 1
 LOCAL_BATCH:  int = 64
 
@@ -36,10 +36,10 @@ LOCAL_BATCH:  int = 64
 SPLIT_MODE: str = "sticky_calibrated"
 
 # Minimal number of connected remote clients to start
-MIN_CLIENTS: int = 2
+MIN_CLIENTS: int = 4
 
 # Warm-up (only for "sticky_calibrated")
-CALIB_SAMPLES_PER_HOST: int = 15000
+CALIB_SAMPLES_PER_HOST: int = 3000
 CALIB_MIN_SAMPLES: int = 512
 SPEED_EMA_BETA: float = 0.7      # smoothing after real rounds
 
@@ -51,7 +51,7 @@ ALLOCATION_EXP: float = 1.0       # >1 gives more work to faster hosts
 ENABLE_CLIENT_SHARD_CACHE: bool = True
 
 # Let the server also train on a shard (acts like a local client)
-SERVER_DOES_TRAIN: bool = True
+SERVER_DOES_TRAIN: bool = False
 
 # Aggregation choice:
 #   "fedavg"  : plain FedAvg (with optional GPU backend)
@@ -59,7 +59,10 @@ AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9  # reserved for future FedAvgM / momentum variants
 
 # Whether to use GPU-based aggregator (CUDA) instead of pure CPU NumPy
-USE_GPU_AGG: bool = True  # safer default; flip to True once libfedavg_gpu.so is ready
+USE_GPU_AGG: bool = False  # safer default; flip to True once libfedavg_gpu.so is ready
+
+# TEST AGGREGATION BENCHMARK FLAG
+TEST_BENCHMARK: bool = False #only can be done with GPU Servers
 
 # ---------------- Early stopping (server-side) ----------------
 EARLY_STOP_ENABLED: bool   = True    # flip to False to disable
@@ -404,6 +407,31 @@ def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
     raise ValueError(f"Unknown AGG_MODE: {AGG_MODE}")
 
 
+def _test_benchmark_aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> Tuple[float, str]:
+    """
+    Run the *other* aggregation backend purely for timing comparison.
+
+    - If USE_GPU_AGG is True (main path uses GPU), benchmark uses CPU.
+    - If USE_GPU_AGG is False (main path uses CPU), benchmark uses GPU.
+    - Does NOT touch GLOBAL_WEIGHTS (caller ignores the result).
+    - Returns (elapsed_seconds, backend_name).
+    """
+    if not updates:
+        raise ValueError("No client updates provided to _test_benchmark_aggregate().")
+
+    t0 = time.perf_counter()
+    if USE_GPU_AGG:
+        # Main path is GPU → benchmark the CPU implementation
+        fl_core.fedavg_weighted_average(updates)
+        backend = "cpu"
+    else:
+        # Main path is CPU → benchmark the GPU implementation
+        fl_core.fedavg_weighted_average_gpu(updates)
+        backend = "gpu"
+    elapsed = time.perf_counter() - t0
+    return elapsed, backend
+
+
 # ======================== Orchestration loop ========================
 def run_rounds():
     global ROUND_NUM, ROUND_IS_OPEN, GLOBAL_WEIGHTS, SHARD_PAYLOADS, TASK_STATUS, TRAINING_IS_DONE, STICKY_SPLITS
@@ -541,6 +569,18 @@ def run_rounds():
             f"train_round={round_train_s:.2f}s (server+clients+agg, no eval)"
         )
         print(f"[SRV][R{ROUND_NUM}] hosts {{ {summary} }}")
+
+        # 4b) Optional benchmark of the *other* aggregation backend.
+        # This happens AFTER train_round timing is captured, so it does NOT
+        # affect train_round or total_train_s, and it does NOT touch GLOBAL_WEIGHTS.
+        if TEST_BENCHMARK:
+            with LOCK:
+                updates_list_bench = list(CLIENT_UPDATES.values())
+            bench_s, bench_backend = _test_benchmark_aggregate(updates_list_bench)
+            print(
+                f"[SRV][R{ROUND_NUM}] benchmark agg({bench_backend})={bench_s:.4f}s "
+                f"(NOT used for GLOBAL_WEIGHTS; not counted in train_round)"
+            )
 
         # 5) Refresh speed estimates (harmless for sticky)
         _update_speed_from_task_status()

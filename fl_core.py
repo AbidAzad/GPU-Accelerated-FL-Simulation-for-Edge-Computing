@@ -284,7 +284,7 @@ def fedavg_weighted_average(
     """
     if not client_updates:
         raise ValueError("No client updates provided to fedavg_weighted_average().")
-
+    print("\n[AGG] CPU is being used for aggregation.")
     weight_lists = [w for (w, n) in client_updates]
     counts = np.array([n for (w, n) in client_updates], dtype=np.float64)
     total = np.sum(counts)
@@ -312,6 +312,7 @@ def fedavg_weighted_average_gpu(
     Flattens all layers into one big vector per client, calls the CUDA kernel,
     then reshapes back to the original layer shapes.
     """
+    print("\n[AGG] GPU is being used for aggregation.")
     if not client_updates:
         raise ValueError("No client updates provided to fedavg_weighted_average_gpu().")
 
