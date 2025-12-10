@@ -1,112 +1,195 @@
-# client.py — CPU-only FL client with persistent model and optional shard caching
+# fl_client.py — FL client aligned with fl_server.py
+# CPU-only local training (server may use CUDA for aggregation)
+#
 # Flow per round:
-#   - Poll server for "ready" task.
+#   - Register with server.
+#   - Poll /pull_task for "ready" work.
 #   - Receive global weights + shard (or reuse cached shard for sticky modes).
 #   - Train locally.
 #   - Post back updated weights + sample count.
 #   - Repeat until server says "done".
 
-# flfrom __future__ import annotations
+from __future__ import annotations
 
-import os, logging, time, requests, numpy as np
-# Force CPU + keep logs down for a quieter console
+import os
+import logging
+import time
+import requests
+import numpy as np  # noqa: F401 (imported for consistency / future use)
+
+# Force CPU locally – server handles GPU aggregation
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 import fl_core
 
-# Point to our server
-# SERVER_URL = "SERVER_URL"                       # <-- set server IP/port
-SERVER_URL = os.getenv("FL_SERVER_URL", "http://127.0.0.1:5000")
-# CLIENT_ID  = "ADD NAME HERE"                    # <-- unique per device
-CLIENT_ID  = os.getenv("CLIENT_ID", "client1")
 
-# Small knobs for this client
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+# Defaults come from the original client, but can be overridden via env vars.
+SERVER_URL = os.getenv("FL_SERVER_URL", "INSERT URL HERE")
+CLIENT_ID  = os.getenv("CLIENT_ID", "INSERT NAME HERE")
+
 LOCAL_EPOCHS = 1
 CLIENT_BATCH = 64
 
 
-def main():
-    # 1) Register until server is reachable
+# ============================================================
+# CLIENT ENTRY
+# ============================================================
+
+def main() -> None:
+    # -----------------------------------------------
+    # 1) Register with the server (retry until success)
+    # -----------------------------------------------
     while True:
         try:
-            requests.post(f"{SERVER_URL}/register", json={"client_id": CLIENT_ID}, timeout=10).raise_for_status()
-            print(f"[CLI {CLIENT_ID}] registered")
+            requests.post(
+                f"{SERVER_URL}/register",
+                json={"client_id": CLIENT_ID},
+                timeout=5,
+            ).raise_for_status()
+            print(f"[CLI {CLIENT_ID}] registered with server.")
             break
         except requests.exceptions.RequestException:
             time.sleep(1)
 
-    # Build-once model (we keep it persistent across rounds)
-    model = None
+    # -----------------------------------------------
+    # Persistent model + shard cache
+    # -----------------------------------------------
+    model = None          # built once and reused across rounds
+    cached_X = None       # cached shard features (for sticky modes)
+    cached_y = None       # cached shard labels
 
-    # For sticky modes with shard caching (server may skip resending after R1)
-    cached_X = None
-    cached_y = None
-
-    # 2) Main polling/training loop
+    # -----------------------------------------------
+    # 2) Main training loop
+    # -----------------------------------------------
     while True:
-        # Ask the server for work
+        # Poll server for work
         try:
-            resp = requests.get(f"{SERVER_URL}/pull_task", params={"client_id": CLIENT_ID}, timeout=300).json()
+            resp = requests.get(
+                f"{SERVER_URL}/pull_task",
+                params={"client_id": CLIENT_ID},
+                timeout=300,
+            ).json()
         except requests.exceptions.RequestException:
-            time.sleep(0.5); continue
+            time.sleep(0.5)
+            continue
 
         status = resp.get("status")
+
+        # -------------------
+        # Training finished
+        # -------------------
         if status == "done":
-            print(f"[CLI {CLIENT_ID}] server signaled completion; exiting.")
+            print(f"[CLI {CLIENT_ID}] training complete. Exiting.")
             break
+
+        # -------------------
+        # No task yet
+        # -------------------
         if status != "ready":
-            # Not ready yet; try again
-            time.sleep(0.2); continue
+            time.sleep(0.2)
+            continue
 
-        # Extract task info
-        rnd            = resp["round"]
-        n_rows_to_train= int(resp["n_samples"])
+        # -------------------
+        # Extract assignment
+        # -------------------
+        rnd = resp["round"]
+        n_rows = int(resp["n_samples"])
         global_weights = fl_core.weights_from_b64(resp["weights_b64"])
+        shard_b64 = resp.get("shard_b64")
 
-        # Either decode fresh shard or reuse our cached one (sticky modes with caching)
-        if resp.get("shard_b64") is None:
+        # -------------------
+        # Sticky shard caching
+        # -------------------
+        if shard_b64 is None:
+            # Server expects us to reuse our cached shard
             if cached_X is None or cached_y is None:
-                # Server expects us to reuse data, but we don't have it (first time or cache lost)
-                print(f"[CLI {CLIENT_ID}][R{rnd}] no cached shard yet; waiting for a resend...")
-                time.sleep(0.5); continue
+                print(
+                    f"[CLI {CLIENT_ID}][R{rnd}] "
+                    "Expected cached shard but none exists. Waiting."
+                )
+                time.sleep(0.5)
+                continue
             X, y = cached_X, cached_y
         else:
-            X, y = fl_core.arrays_from_b64(resp["shard_b64"])
-            cached_X, cached_y = X, y  # save for later rounds if server uses caching
+            # New shard received → decode & cache
+            X, y = fl_core.arrays_from_b64(shard_b64)
+            cached_X, cached_y = X, y
 
-        # Build the local model once (identical architecture to centralized)
+        # For network_traffic + network_mlp, infer input dim from this shard
+        if (
+            getattr(fl_core, "MODEL_TYPE", None) == "network_mlp"
+            and getattr(fl_core, "DATASET_TYPE", None) == "network_traffic"
+        ):
+            # If NETWORK_INPUT_DIM isn't set yet, set it from X
+            if getattr(fl_core, "NETWORK_INPUT_DIM", None) in (None, 0):
+                fl_core.NETWORK_INPUT_DIM = X.shape[1]
+
+        # -------------------
+        # Build local model ONCE per client
+        # -------------------
         if model is None:
             num_classes = y.shape[1]
             model = fl_core.build_model(num_classes)
             fl_core.prime_model(model)
 
-        # Load the current global weights for this round
+        # -------------------
+        # Build local model ONCE per client
+        # -------------------
+        if model is None:
+            num_classes = y.shape[1]
+            model = fl_core.build_model(num_classes)
+            fl_core.prime_model(model)
+
+        # -------------------
+        # Load global weights into local model
+        # -------------------
         model.set_weights(global_weights)
 
-        # Train locally
+        # -------------------
+        # Local training
+        # -------------------
         t0 = time.perf_counter()
-        print(f"[CLI {CLIENT_ID}][R{rnd}] train start n={n_rows_to_train}")
+        print(f"[CLI {CLIENT_ID}][R{rnd}] training start on n={n_rows}")
         model.fit(X, y, epochs=LOCAL_EPOCHS, batch_size=CLIENT_BATCH, verbose=0)
         train_s = time.perf_counter() - t0
 
-        # Send updated weights back to the server
-        upd = fl_core.weights_to_b64(model.get_weights())
+        # -------------------
+        # Send model update back
+        # -------------------
+        upd_b64 = fl_core.weights_to_b64(model.get_weights())
+
         try:
             requests.post(
                 f"{SERVER_URL}/submit_update",
-                json={"client_id": CLIENT_ID, "round": rnd, "weights_b64": upd, "n_samples": n_rows_to_train},
-                timeout=60
+                json={
+                    "client_id": CLIENT_ID,
+                    "round": rnd,
+                    "weights_b64": upd_b64,
+                    "n_samples": n_rows,
+                },
+                timeout=60,
             ).raise_for_status()
-            print(f"[CLI {CLIENT_ID}][R{rnd}] submitted train={train_s:.2f}s")
+            print(
+                f"[CLI {CLIENT_ID}][R{rnd}] submitted update "
+                f"(train={train_s:.2f}s)"
+            )
         except requests.exceptions.RequestException as e:
-            print(f"[CLI {CLIENT_ID}] submit failed: {e}")
+            print(f"[CLI {CLIENT_ID}] submission failed: {e}")
             time.sleep(1)
 
-        # Small pause to avoid hammering the server
+        # Small pause to reduce polling pressure
         time.sleep(0.2)
 
+
+# ============================================================
+# Start Client
+# ============================================================
 
 if __name__ == "__main__":
     main()
