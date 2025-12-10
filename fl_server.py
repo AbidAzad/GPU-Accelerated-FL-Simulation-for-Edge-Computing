@@ -623,7 +623,7 @@ def run_rounds():
         total_train_s += round_train_s
 
         print(
-            f"[SRV][R{ROUND_NUM}] agg={agg_s:.2f}s | "
+            f"[SRV][R{ROUND_NUM}] agg={agg_s:.5f}s | "
             f"train_round={round_train_s:.2f}s "
             f"(server+clients+agg, no eval)"
         )
@@ -640,7 +640,7 @@ def run_rounds():
             )
             print(
                 f"[SRV][R{ROUND_NUM}] benchmark agg({bench_backend})="
-                f"{bench_s:.4f}s "
+                f"{bench_s:.5f}s "
                 f"(NOT used for GLOBAL_WEIGHTS; not counted in train_round)"
             )
 

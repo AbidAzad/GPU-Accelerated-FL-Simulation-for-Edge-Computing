@@ -22,8 +22,8 @@ import tensorflow as tf
 # ============================================================
 
 # Switches (server & clients all see the same import)
-MODEL_TYPE   = "network_mlp"                       # options: "lstm", "cifar_resnet", "network_mlp"
-DATASET_TYPE = "network_traffic"              # options: "cyber_threat", "cifar10", "network_traffic"
+MODEL_TYPE   = "cifar_resnet"                       # options: "lstm", "cifar_resnet", "network_mlp"
+DATASET_TYPE = "cifar10"              # options: "cyber_threat", "cifar10", "network_traffic"
 
 # Text model / dataset parameters (LSTM + cyber-threat)
 MAX_NB_WORDS   = 50000
@@ -52,6 +52,11 @@ else:
     FEDAVG_LIB_PATH = BASE_DIR / "fedavg_gpu" / "libfedavg_gpu.so"
 
 _FEDAVG_LIB: ctypes.CDLL | None = None
+
+# Internal cache for FedAvg GPU to amortize shape/size computations
+_FEDAVG_LAYER_SHAPES: List[tuple] | None = None
+_FEDAVG_LAYER_SIZES: List[int] | None = None
+_FEDAVG_TOTAL_PARAMS: int = 0
 
 # Saved label names for the cyber-threat dataset (filled in _prepare_text_dataset)
 CYBER_CLASS_NAMES: List[str] | None = None
@@ -414,11 +419,15 @@ def arrays_from_b64(s):
 def fedavg_weighted_average(
     client_updates: List[Tuple[List[np.ndarray], int]]
 ) -> List[np.ndarray]:
-    """
-    Pure NumPy (CPU) FedAvg.
+    """Pure NumPy (CPU) FedAvg (reference implementation).
+
+    This remains the simple, obvious implementation and is mainly used:
+      * when USE_GPU_AGG is False, or
+      * for debugging / correctness checks.
     """
     if not client_updates:
         raise ValueError("No client updates provided to fedavg_weighted_average().")
+
     print("\n[AGG] CPU is being used for aggregation.")
     weight_lists = [w for (w, n) in client_updates]
     counts = np.array([n for (w, n) in client_updates], dtype=np.float64)
@@ -442,60 +451,101 @@ def fedavg_weighted_average(
 def fedavg_weighted_average_gpu(
     client_updates: List[Tuple[List[np.ndarray], int]]
 ) -> List[np.ndarray]:
+    """High-performance FedAvg using the CUDA DLL/SO.
     """
-    GPU-oriented FedAvg using fedavg_gpu.dll (.so on Linux).
-    Flattens all layers into one big vector per client, calls the CUDA kernel,
-    then reshapes back to the original layer shapes.
-    """
-    print("\n[AGG] GPU is being used for aggregation.")
     if not client_updates:
         raise ValueError("No client updates provided to fedavg_weighted_average_gpu().")
 
-    # Unpack weights and counts
+    print("\n[AGG] GPU is being used for aggregation.")
+
+    # Unpack weights and sample counts
     weight_lists: List[List[np.ndarray]] = [w for (w, n) in client_updates]
     counts = np.asarray([n for (w, n) in client_updates], dtype=np.int32)
-    total_samples = int(np.sum(counts))
 
-    if total_samples == 0:
-        raise ValueError("Total number of samples is zero in fedavg_weighted_average_gpu().")
+    if counts.ndim != 1:
+        raise ValueError("Counts array must be 1D in fedavg_weighted_average_gpu().")
 
-    # Use the first client's weights as a reference for shapes/dtypes
+    num_clients = counts.shape[0]
+    if num_clients <= 0:
+        raise ValueError("num_clients must be > 0 in fedavg_weighted_average_gpu().")
+
+    # ------------------------------------------------------------------
+    # Lazily initialise / validate the cached layer metadata
+    # ------------------------------------------------------------------
+    global _FEDAVG_LAYER_SHAPES, _FEDAVG_LAYER_SIZES, _FEDAVG_TOTAL_PARAMS
+
     ref_weights: List[np.ndarray] = weight_lists[0]
-    layer_shapes = [w.shape for w in ref_weights]
-    layer_sizes  = [int(np.prod(shape)) for shape in layer_shapes]
-    total_params = sum(layer_sizes)
 
-    # Flatten all layers for each client into one 1D vector
-    flat_list: List[np.ndarray] = []
-    for idx, weights in enumerate(weight_lists):
-        flat_client = np.concatenate(
-            [w.reshape(-1) for w in weights],
-            axis=0
-        ).astype(np.float32)
+    if _FEDAVG_LAYER_SHAPES is None:
+        # First call: capture layer shapes/sizes and total param count
+        _FEDAVG_LAYER_SHAPES = [w.shape for w in ref_weights]
+        _FEDAVG_LAYER_SIZES  = [int(np.prod(shape)) for shape in _FEDAVG_LAYER_SHAPES]
+        _FEDAVG_TOTAL_PARAMS = int(sum(_FEDAVG_LAYER_SIZES))
+    else:
+        # Basic safety check: if total_params changes, re-infer metadata.
+        total_params_now = int(sum(int(np.prod(w.shape)) for w in ref_weights))
+        if total_params_now != _FEDAVG_TOTAL_PARAMS:
+            _FEDAVG_LAYER_SHAPES = [w.shape for w in ref_weights]
+            _FEDAVG_LAYER_SIZES  = [int(np.prod(shape)) for shape in _FEDAVG_LAYER_SHAPES]
+            _FEDAVG_TOTAL_PARAMS = int(sum(_FEDAVG_LAYER_SIZES))
 
-        if flat_client.size != total_params:
+    layer_shapes = _FEDAVG_LAYER_SHAPES
+    layer_sizes  = _FEDAVG_LAYER_SIZES
+    total_params = _FEDAVG_TOTAL_PARAMS
+
+    if total_params <= 0:
+        raise ValueError("total_params <= 0 in fedavg_weighted_average_gpu().")
+
+    # ------------------------------------------------------------------
+    # Flatten all layers for each client into one 1D vector in a single pass
+    # ------------------------------------------------------------------
+    flat_stack = np.empty((num_clients, total_params), dtype=np.float32)
+
+    for client_idx, weights in enumerate(weight_lists):
+        if len(weights) != len(layer_shapes):
             raise ValueError(
-                f"All clients must share the same total parameter count. "
-                f"client {idx} has {flat_client.size}, expected {total_params}"
+                f"Client {client_idx} layer count mismatch: "
+                f"{len(weights)} vs expected {len(layer_shapes)}"
             )
 
-        flat_list.append(flat_client)
+        offset = 0
+        for w, size, shape in zip(weights, layer_sizes, layer_shapes):
+            if w.shape != shape:
+                raise ValueError(
+                    f"Client {client_idx} layer shape mismatch: "
+                    f"got {w.shape}, expected {shape}"
+                )
 
-    # Shape (num_clients, total_params)
-    flat_stack = np.stack(flat_list, axis=0)
+            flat_view = w.reshape(-1).astype(np.float32, copy=False)
+            if flat_view.size != size:
+                raise ValueError(
+                    f"Client {client_idx} layer size mismatch: "
+                    f"{flat_view.size} vs expected {size}"
+                )
+
+            flat_stack[client_idx, offset:offset + size] = flat_view
+            offset += size
+
+        if offset != total_params:
+            raise ValueError(
+                f"Client {client_idx} wrote {offset} params, expected {total_params}"
+            )
+
     flat_stack = np.ascontiguousarray(flat_stack, dtype=np.float32)
     counts     = np.ascontiguousarray(counts, dtype=np.int32)
 
-    num_clients, total_params_check = flat_stack.shape
-    assert total_params_check == total_params
+    num_clients_check, total_params_check = flat_stack.shape
+    if num_clients_check != num_clients or total_params_check != total_params:
+        raise RuntimeError("Internal shape mismatch in fedavg_weighted_average_gpu().")
 
-    out = np.empty(total_params, dtype=np.float32)
+    # Output buffer for the averaged parameter vector
+    out_flat = np.empty(total_params, dtype=np.float32)
 
     lib = _load_fedavg_lib()
 
     ptr_weights = flat_stack.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
     ptr_counts  = counts.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-    ptr_out     = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    ptr_out     = out_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
     lib.fedavg_weighted_average_gpu(
         ptr_weights,
@@ -505,18 +555,20 @@ def fedavg_weighted_average_gpu(
         ctypes.c_int(total_params),
     )
 
-    flat_avg = out  # shape: (total_params,)
-
+    # ------------------------------------------------------------------
     # Reshape averaged vector back into per-layer tensors
+    # ------------------------------------------------------------------
     averaged_weights: List[np.ndarray] = []
     offset = 0
     for shape, size, ref_w in zip(layer_shapes, layer_sizes, ref_weights):
-        chunk = flat_avg[offset:offset + size]
+        chunk = out_flat[offset:offset + size]
         averaged_weights.append(chunk.reshape(shape).astype(ref_w.dtype))
         offset += size
 
-    return averaged_weights
+    if offset != total_params:
+        raise RuntimeError("Did not consume all parameters when reshaping averaged weights.")
 
+    return averaged_weights
 
 # ============================================================
 # MODEL PRIMING
