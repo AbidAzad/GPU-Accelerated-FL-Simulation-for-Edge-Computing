@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -22,8 +22,8 @@ import tensorflow as tf
 # ============================================================
 
 # Switches (server & clients all see the same import)
-MODEL_TYPE   = "lstm"                       # options: "lstm", "cifar_resnet"
-DATASET_TYPE = "cyber_threat"              # options: "cyber_threat", "cifar10"
+MODEL_TYPE   = "lstm"                       # options: "lstm", "cifar_resnet", "network_mlp"
+DATASET_TYPE = "cyber_threat"              # options: "cyber_threat", "cifar10", "network_traffic"
 
 # Text model / dataset parameters (LSTM + cyber-threat)
 MAX_NB_WORDS   = 50000
@@ -41,6 +41,10 @@ CIFAR_PATH          = CIFAR_DIR / "cifar10.npz"
 CIFAR_INPUT_SHAPE   = (32, 32, 3)
 CIFAR_LEARNING_RATE = 1e-3
 
+# Network-traffic CSV (TABULAR features)
+# TODO: point this to your actual network-traffic CSV file.
+NETWORK_FLOW_PATH = BASE_DIR / "NetworkTraffic" / "network_traffic.csv"
+
 # Path to CUDA FedAvg shared library
 if sys.platform.startswith("win"):
     FEDAVG_LIB_PATH = BASE_DIR / "fedavg_gpu" / "fedavg_gpu.dll"
@@ -51,6 +55,10 @@ _FEDAVG_LIB: ctypes.CDLL | None = None
 
 # Saved label names for the cyber-threat dataset (filled in _prepare_text_dataset)
 CYBER_CLASS_NAMES: List[str] | None = None
+
+# Saved label names + feature dim for the network-traffic dataset
+NETWORK_CLASS_NAMES: List[str] | None = None
+NETWORK_INPUT_DIM: int | None = None
 
 
 def _load_fedavg_lib() -> ctypes.CDLL:
@@ -66,6 +74,12 @@ def _load_fedavg_lib() -> ctypes.CDLL:
 
     lib = ctypes.cdll.LoadLibrary(str(FEDAVG_LIB_PATH))
 
+    # extern "C" void fedavg_weighted_average_gpu(
+    #     const float* h_client_weights,
+    #     const int*   h_counts,
+    #     float*       h_out,
+    #     int          num_clients,
+    #     int          vec_len);
     lib.fedavg_weighted_average_gpu.argtypes = [
         ctypes.POINTER(ctypes.c_float),  # h_client_weights
         ctypes.POINTER(ctypes.c_int),    # h_counts
@@ -93,10 +107,8 @@ def build_model(num_classes: int):
         return _build_lstm(num_classes)
     if MODEL_TYPE == "cifar_resnet":
         return _build_cifar_resnet(num_classes)
-
-    # For future:
-    # elif MODEL_TYPE == "othermodel":
-    #     return _build_othermodel(num_classes)
+    if MODEL_TYPE == "network_mlp":
+        return _build_network_mlp(num_classes)
 
     raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
 
@@ -146,30 +158,67 @@ def _build_cifar_resnet(num_classes: int):
     return model
 
 
+def _build_network_mlp(num_classes: int):
+    """
+    Simple MLP for tabular network-traffic data.
+
+    Expects NETWORK_INPUT_DIM to be set by _prepare_network_dataset()
+    via load_data() before this is called.
+    """
+    global NETWORK_INPUT_DIM
+    if NETWORK_INPUT_DIM is None:
+        raise RuntimeError(
+            "NETWORK_INPUT_DIM is not set. "
+            "Call load_data() with DATASET_TYPE='network_traffic' before build_model()."
+        )
+
+    inputs = tf.keras.Input(shape=(NETWORK_INPUT_DIM,), name="features")
+    x = tf.keras.layers.Dense(256, activation="relu")(inputs)
+    x = tf.keras.layers.Dropout(0.3)(x)
+    x = tf.keras.layers.Dense(128, activation="relu")(x)
+    x = tf.keras.layers.Dropout(0.3)(x)
+    x = tf.keras.layers.Dense(64, activation="relu")(x)
+    outputs = tf.keras.layers.Dense(num_classes, activation="softmax")(x)
+
+    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="NetworkTrafficMLP")
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
+
+
 # ============================================================
 # DATASET SWITCHER
 # ============================================================
 
-def load_data():
+def load_data(nrows: int | None = None):
     """
     Returns: X_train, X_test, y_train, y_test, num_classes
+
+    nrows: optional row limit for quick dev (only used for CSV-based datasets).
     """
     global DATASET_TYPE
 
     if DATASET_TYPE == "cyber_threat":
-        df = _load_cti_dataset(CYBER_DF_PATH)
+        df = _load_cti_dataset(CYBER_DF_PATH, nrows=nrows)
         return _prepare_text_dataset(df)
 
     if DATASET_TYPE == "cifar10":
         return _load_cifar10_dataset(CIFAR_PATH)
+
+    if DATASET_TYPE == "network_traffic":
+        return _load_network_traffic_dataset(NETWORK_FLOW_PATH, nrows=nrows)
 
     raise ValueError(f"Unknown DATASET_TYPE: {DATASET_TYPE}")
 
 
 # ---------- cyber-threat text dataset ----------
 
-def _load_cti_dataset(path: Path):
-    df = pd.read_csv(path)
+def _load_cti_dataset(path: Path, nrows: int | None = None):
+    df = pd.read_csv(path, nrows=nrows)
     df["text"]  = df["text"].fillna("")
     df["label"] = df["label"].fillna("benign")
     return df[["text", "label"]]
@@ -240,6 +289,92 @@ def _load_cifar10_dataset(path: Path):
     y_test  = to_categorical(y_test_int, num_classes)
 
     return x_train, x_test, y_train, y_test, num_classes
+
+
+# ---------- Network-traffic tabular dataset ----------
+
+def _load_network_traffic_dataset(path: Path, nrows: int | None = None):
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Network-traffic CSV not found at {path}. "
+            "Update NETWORK_FLOW_PATH to point to your dataset."
+        )
+
+    df = pd.read_csv(path, nrows=nrows)
+    return _prepare_network_dataset(df)
+
+
+def _prepare_network_dataset(df: pd.DataFrame):
+    """
+    Prepare a generic tabular network-traffic dataset:
+
+      * Auto-detect label column by name (label/attack/class/etc.)
+      * Keep numeric feature columns, try to coerce non-numeric
+      * Scale features with StandardScaler
+      * Stratified train/test split
+    """
+    if df.empty:
+        raise ValueError("Network-traffic DataFrame is empty.")
+
+    # --- Label column detection ---
+    # Try common name patterns
+    candidates = []
+    for col in df.columns:
+        col_l = col.lower()
+        if any(key in col_l for key in ["label", "attack", "class", "category", "result"]):
+            candidates.append(col)
+
+    if not candidates:
+        raise ValueError(
+            "Could not automatically find a label column in network-traffic dataset. "
+            "Expected a column containing one of: label, attack, class, category, result."
+        )
+
+    label_col = candidates[0]
+    y_raw = df[label_col].astype(str)
+
+    # Features: drop label and obviously non-feature columns like timestamps
+    feature_df = df.drop(columns=[label_col])
+
+    # Drop columns that are all NaN or constant
+    feature_df = feature_df.dropna(axis=1, how="all")
+    nunique = feature_df.nunique(dropna=False)
+    feature_df = feature_df.loc[:, nunique > 1]
+
+    # Try to coerce non-numeric columns to numeric where possible
+    for col in feature_df.columns:
+        if not np.issubdtype(feature_df[col].dtype, np.number):
+            try:
+                feature_df[col] = pd.to_numeric(feature_df[col], errors="raise")
+            except Exception:
+                # If still non-numeric, drop the column
+                feature_df = feature_df.drop(columns=[col])
+
+    if feature_df.empty:
+        raise ValueError("No numeric feature columns remain in network-traffic dataset.")
+
+    X = feature_df.fillna(0.0).astype("float32")
+
+    # Encode labels
+    enc = LabelEncoder()
+    y_int = enc.fit_transform(y_raw)
+    num_classes = len(enc.classes_)
+    y = to_categorical(y_int, num_classes)
+
+    # Save globals for later usage (metrics + model building)
+    global NETWORK_CLASS_NAMES, NETWORK_INPUT_DIM
+    NETWORK_CLASS_NAMES = enc.classes_.tolist()
+    NETWORK_INPUT_DIM   = X.shape[1]
+
+    # Scale features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X).astype("float32")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_scaled, y, test_size=TEST_SIZE, stratify=y_int
+    )
+
+    return X_train, X_test, y_train, y_test, num_classes
 
 
 # ============================================================
@@ -382,6 +517,7 @@ def fedavg_weighted_average_gpu(
 
     return averaged_weights
 
+
 # ============================================================
 # MODEL PRIMING
 # ============================================================
@@ -404,12 +540,24 @@ def prime_model(model, seq_len: int = MAX_SEQ_LENGTH):
         _ = model(dummy_input, training=False)
         return model
 
+    if MODEL_TYPE == "network_mlp":
+        # Use NETWORK_INPUT_DIM determined by _prepare_network_dataset
+        global NETWORK_INPUT_DIM
+        if NETWORK_INPUT_DIM is None:
+            raise RuntimeError(
+                "NETWORK_INPUT_DIM is not set. "
+                "Call load_data() for DATASET_TYPE='network_traffic' before prime_model()."
+            )
+        dummy_input = np.zeros((1, NETWORK_INPUT_DIM), dtype="float32")
+        _ = model(dummy_input, training=False)
+        return model
+
     # Fallback: just return the model without priming
     return model
 
 
 # ============================================================
-# CYBER-THREAT METRICS (SERVER USES THIS)
+# METRICS HELPERS (SERVER USES THESE)
 # ============================================================
 
 def print_cyber_threat_metrics(model, X_test, y_test, round_num: int) -> None:
@@ -474,3 +622,41 @@ def print_cyber_threat_metrics(model, X_test, y_test, round_num: int) -> None:
     print(f"  Malicious samples:  {malicious_mask.sum()} ({malicious_pct:.1f}%)")
     print(f"  Benign accuracy:    {benign_acc * 100:.2f}%")
     print(f"  Malicious accuracy: {malicious_acc * 100:.2f}%")
+
+
+def print_network_traffic_metrics(model, X_test, y_test, round_num: int) -> None:
+    """
+    Print detailed classification metrics for the network-traffic tabular dataset.
+
+    Assumes y_test is one-hot encoded. Uses NETWORK_CLASS_NAMES when available.
+    """
+    if DATASET_TYPE != "network_traffic":
+        print(f"[SRV][R{round_num}] print_network_traffic_metrics() skipped (DATASET_TYPE={DATASET_TYPE!r})")
+        return
+
+    from sklearn.metrics import classification_report, confusion_matrix
+
+    # Get predictions
+    y_pred_probs = model.predict(X_test, verbose=0)
+    y_pred = np.argmax(y_pred_probs, axis=1)
+    y_true = np.argmax(y_test, axis=1)
+
+    # Class names
+    if NETWORK_CLASS_NAMES is not None:
+        class_names = NETWORK_CLASS_NAMES
+    else:
+        class_names = sorted(list({int(c) for c in np.unique(y_true)}))
+        class_names = [str(c) for c in class_names]
+
+    print(f"\n[SRV][R{round_num}] Network-Traffic Classification Report:")
+    try:
+        print(classification_report(y_true, y_pred, target_names=class_names, zero_division=0))
+    except Exception as e:
+        print(f"[SRV][R{round_num}] classification_report failed: {e}")
+
+    try:
+        cm = confusion_matrix(y_true, y_pred)
+        print(f"\n[SRV][R{round_num}] Confusion Matrix (rows=true, cols=pred):")
+        print(cm)
+    except Exception as e:
+        print(f"[SRV][R{round_num}] confusion_matrix failed: {e}")

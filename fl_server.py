@@ -1,13 +1,5 @@
-# fl_server.py — FL server with sticky/adaptive splits, optional GPU aggregation, and early stopping
-#
-# What we do here:
-#   1) Wait for clients (HTTP).
-#   2) Build assignments (who trains on which rows).
-#   3) Send global weights + each client's shard.
-#   4) Receive updated weights from each client.
-#   5) Aggregate with FedAvg (CPU or CUDA C++).
-#   6) Repeat for N rounds, with server-side early stopping.
-#
+# fl_server.py — FL server with sticky/adaptive splits, optional GPU aggregation,
+# early stopping, and dataset-specific metrics (cyber + network traffic)
 
 from __future__ import annotations
 
@@ -59,17 +51,17 @@ AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9  # reserved for future FedAvgM / momentum variants
 
 # Whether to use GPU-based aggregator (CUDA) instead of pure CPU NumPy
-USE_GPU_AGG: bool = False  # safer default; flip to True once libfedavg_gpu.so is ready
+USE_GPU_AGG: bool = False  # safer default; flip to True once libfedavg_gpu is ready
 
 # TEST AGGREGATION BENCHMARK FLAG
-TEST_BENCHMARK: bool = False #only can be done with GPU Servers
+TEST_BENCHMARK: bool = False  # only can be done with GPU servers
 
 # ---------------- Early stopping (server-side) ----------------
-EARLY_STOP_ENABLED: bool   = True    # flip to False to disable
-EARLY_STOP_PATIENCE: int   = 5       # rounds with no improvement before stopping
-EARLY_STOP_MIN_DELTA: float = 1e-3   # required improvement to reset patience
-EARLY_STOP_MONITOR: str    = "acc"   # "acc" or "loss"
-EARLY_STOP_MODE: str       = "max"   # "max" for acc, "min" for loss
+EARLY_STOP_ENABLED: bool    = True    # flip to False to disable
+EARLY_STOP_PATIENCE: int    = 5       # rounds with no improvement before stopping
+EARLY_STOP_MIN_DELTA: float = 1e-3    # required improvement to reset patience
+EARLY_STOP_MONITOR: str     = "acc"   # "acc" or "loss"
+EARLY_STOP_MODE: str        = "max"   # "max" for acc, "min" for loss
 
 
 # ======================== Global in-memory state ========================
@@ -116,7 +108,8 @@ def _ensure_global_weights():
 
 
 # ======================== Split helpers ========================
-def _split_even_indices(participants: List[str], n_total: int, seed: Optional[int] = None) -> Dict[str, np.ndarray]:
+def _split_even_indices(participants: List[str], n_total: int,
+                        seed: Optional[int] = None) -> Dict[str, np.ndarray]:
     """
     Even split without stratification. Used only for warm-up timing.
     """
@@ -132,7 +125,10 @@ def _sizes_from_speed(participants: List[str]) -> Dict[str, int]:
     Faster hosts get more rows.
     """
     n_total = X_train_all.shape[0]
-    v = np.array([max(SAMPLES_PER_SEC.get(pid, 1.0), 1e-6) for pid in participants], dtype=np.float64)
+    v = np.array(
+        [max(SAMPLES_PER_SEC.get(pid, 1.0), 1e-6) for pid in participants],
+        dtype=np.float64,
+    )
     v = np.power(v, ALLOCATION_EXP)    # optional nonlinearity
     props = v / v.sum()
 
@@ -141,13 +137,17 @@ def _sizes_from_speed(participants: List[str]) -> Dict[str, int]:
 
     # Fix rounding so the sizes add to n_total exactly
     while sizes.sum() > n_total:
-        j = int(np.argmax(sizes)); sizes[j] -= 1
+        j = int(np.argmax(sizes))
+        sizes[j] -= 1
     while sizes.sum() < n_total:
-        j = int(np.argmax(props)); sizes[j] += 1
+        j = int(np.argmax(props))
+        sizes[j] += 1
     return {pid: int(sz) for pid, sz in zip(participants, sizes)}
 
 
-def _build_stratified_indices(participants: List[str], sizes: Dict[str, int], seed: int) -> Dict[str, np.ndarray]:
+def _build_stratified_indices(participants: List[str],
+                              sizes: Dict[str, int],
+                              seed: int) -> Dict[str, np.ndarray]:
     """
     Build stratified splits once so label proportions per host are close to global.
     This usually makes FedAvg behave more like centralized.
@@ -173,7 +173,9 @@ def _build_stratified_indices(participants: List[str], sizes: Dict[str, int], se
         want = {c: int(round(target * class_prop[c])) for c in class_prop}
         # Fix rounding so sum == target
         diff = target - sum(want.values())
-        order = sorted(class_prop.keys(), key=lambda c: class_prop[c], reverse=True)
+        order = sorted(class_prop.keys(),
+                       key=lambda c: class_prop[c],
+                       reverse=True)
         k = 0
         while diff != 0:
             c = order[k % len(order)]
@@ -188,10 +190,13 @@ def _build_stratified_indices(participants: List[str], sizes: Dict[str, int], se
             if cnt > 0:
                 taken.append(remain[c][-cnt:])
                 remain[c] = remain[c][:-cnt]
-        out[pid] = np.concatenate(taken) if taken else np.array([], dtype=np.int64)
+        out[pid] = (np.concatenate(taken)
+                    if taken else np.array([], dtype=np.int64))
 
     # Hand leftovers (if any) to the largest shard so nothing is wasted
-    leftovers = np.concatenate(list(remain.values())) if any(len(remain[c]) for c in remain) else np.array([], dtype=np.int64)
+    leftovers = (np.concatenate(list(remain.values()))
+                 if any(len(remain[c]) for c in remain)
+                 else np.array([], dtype=np.int64))
     if leftovers.size > 0:
         big = max(participants, key=lambda p: out[p].size)
         out[big] = np.concatenate([out[big], leftovers])
@@ -214,7 +219,10 @@ def _update_speed_from_task_status():
                 SAMPLES_PER_SEC[cid] = thr
             else:
                 # EMA smooth so one noisy round doesn't swing the allocation too much
-                SAMPLES_PER_SEC[cid] = SPEED_EMA_BETA * prev + (1.0 - SPEED_EMA_BETA) * thr
+                SAMPLES_PER_SEC[cid] = (
+                    SPEED_EMA_BETA * prev +
+                    (1.0 - SPEED_EMA_BETA) * thr
+                )
 
 
 # ======================== HTTP endpoints (clients call these) ========================
@@ -243,15 +251,21 @@ def pull_task():
 
         # Finish signal
         if TRAINING_IS_DONE:
-            return jsonify({"ok": True, "status": "done", "round": ROUND_NUM})
+            return jsonify({"ok": True,
+                            "status": "done",
+                            "round": ROUND_NUM})
 
         # If round isn't ready yet or this client has nothing pending
         if not ROUND_IS_OPEN or cid not in TASK_STATUS:
-            return jsonify({"ok": True, "status": "wait", "round": ROUND_NUM})
+            return jsonify({"ok": True,
+                            "status": "wait",
+                            "round": ROUND_NUM})
 
         # Another poll while waiting is fine
         if TASK_STATUS[cid]["status"] != "pending":
-            return jsonify({"ok": True, "status": "wait", "round": ROUND_NUM})
+            return jsonify({"ok": True,
+                            "status": "wait",
+                            "round": ROUND_NUM})
 
         # Global weights must exist
         if GLOBAL_WEIGHTS is None or len(GLOBAL_WEIGHTS) == 0:
@@ -259,21 +273,28 @@ def pull_task():
 
         # Mark as claimed and build the payload
         TASK_STATUS[cid]["status"] = "claimed"
-        TASK_STATUS[cid]["start"]  = time.perf_counter()
+        TASK_STATUS[cid]["start"] = time.perf_counter()
         weights_b64 = fl_core.weights_to_b64(GLOBAL_WEIGHTS)
 
         shard_b64, n_samples = SHARD_PAYLOADS[cid]
 
         # In sticky modes, after round 1, we can skip resending the shard if cache is enabled.
         send_shard_now = True
-        if ENABLE_CLIENT_SHARD_CACHE and SPLIT_MODE in ("sticky_calibrated", "sticky_equal") and ROUND_NUM > 1:
+        if (ENABLE_CLIENT_SHARD_CACHE and
+                SPLIT_MODE in ("sticky_calibrated", "sticky_equal") and
+                ROUND_NUM > 1):
             send_shard_now = False
             shard_b64 = None
 
-    print(f"[SRV][R{ROUND_NUM}] -> {cid}: n={n_samples}{'' if send_shard_now else ' (cached shard)'}")
+    print(f"[SRV][R{ROUND_NUM}] -> {cid}: n={n_samples}"
+          f"{'' if send_shard_now else ' (cached shard)'}")
     return jsonify({
-        "ok": True, "status": "ready", "round": ROUND_NUM,
-        "weights_b64": weights_b64, "shard_b64": shard_b64, "n_samples": n_samples
+        "ok": True,
+        "status": "ready",
+        "round": ROUND_NUM,
+        "weights_b64": weights_b64,
+        "shard_b64": shard_b64,
+        "n_samples": n_samples,
     })
 
 
@@ -283,8 +304,11 @@ def submit_update():
     Clients post back their updated weights and the number of rows they trained on.
     """
     p = request.json or {}
-    cid = p.get("client_id"); rnd = p.get("round")
-    weights_b64 = p.get("weights_b64"); n_samples = int(p.get("n_samples", 0))
+    cid = p.get("client_id")
+    rnd = p.get("round")
+    weights_b64 = p.get("weights_b64")
+    n_samples = int(p.get("n_samples", 0))
+
     if not all([cid, weights_b64]) or rnd is None:
         return jsonify({"ok": False, "error": "missing fields"}), 400
 
@@ -294,13 +318,16 @@ def submit_update():
         if rnd != ROUND_NUM:
             return jsonify({"ok": True, "note": "stale round ignored"})
         if cid not in TASK_STATUS:
-            return jsonify({"ok": True, "note": "unknown client this round (ignored)"})
+            return jsonify({"ok": True,
+                            "note": "unknown client this round (ignored)"})
         if TASK_STATUS[cid]["status"] == "done":
-            return jsonify({"ok": True, "note": "duplicate ignored"})
+            return jsonify({"ok": True,
+                            "note": "duplicate ignored"})
 
-        TASK_STATUS[cid]["status"]  = "done"
+        TASK_STATUS[cid]["status"] = "done"
         TASK_STATUS[cid]["train_s"] = (
-            time.perf_counter() - TASK_STATUS[cid].get("start", time.perf_counter())
+            time.perf_counter() -
+            TASK_STATUS[cid].get("start", time.perf_counter())
         )
         CLIENT_UPDATES[cid] = (updated_weights, n_samples)
         t_s = TASK_STATUS[cid]["train_s"]
@@ -310,9 +337,12 @@ def submit_update():
 
 
 # ======================== Server local training ========================
-def _server_train_on_shard(start_weights, X, y, epochs=1, batch=LOCAL_BATCH):
+def _server_train_on_shard(start_weights, X, y,
+                           epochs: int = 1,
+                           batch: int = LOCAL_BATCH):
     """
-    Server trains on its own shard like a client, then reports back into CLIENT_UPDATES.
+    Server trains on its own shard like a client,
+    then reports back into CLIENT_UPDATES.
     """
     m = _build_global_model()
     fl_core.prime_model(m)
@@ -324,10 +354,11 @@ def _server_train_on_shard(start_weights, X, y, epochs=1, batch=LOCAL_BATCH):
 
     upd = m.get_weights()
     with LOCK:
-        TASK_STATUS["server"]["status"]  = "done"
+        TASK_STATUS["server"]["status"] = "done"
         TASK_STATUS["server"]["train_s"] = train_s
         CLIENT_UPDATES["server"] = (upd, X.shape[0])
-    print(f"[SRV][R{ROUND_NUM}] (server) done: n={X.shape[0]}, train={train_s:.2f}s")
+    print(f"[SRV][R{ROUND_NUM}] (server) done: n={X.shape[0]}, "
+          f"train={train_s:.2f}s")
 
 
 # ======================== Calibration (only for sticky_calibrated) ========================
@@ -341,19 +372,20 @@ def _run_one_time_calibration(participants: List[str]) -> None:
     print("[SRV] calibration start...")
 
     per_host = max(CALIB_SAMPLES_PER_HOST, CALIB_MIN_SAMPLES)
-    total    = min(per_host * len(participants), X_train_all.shape[0])
+    total = min(per_host * len(participants), X_train_all.shape[0])
 
     parts = _split_even_indices(participants, n_total=total, seed=999)
 
     with LOCK:
         SHARD_PAYLOADS = {}
-        TASK_STATUS    = {}
+        TASK_STATUS = {}
         CLIENT_UPDATES.clear()
         for pid in participants:
             idxs = parts[pid]
             Xp, yp = X_train_all[idxs], y_train_all[idxs]
-            SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp), int(Xp.shape[0]))
-            TASK_STATUS[pid]    = {"status": "pending", "n": int(Xp.shape[0])}
+            SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp),
+                                   int(Xp.shape[0]))
+            TASK_STATUS[pid] = {"status": "pending", "n": int(Xp.shape[0])}
         ROUND_IS_OPEN = True
         ROUND_NUM = 0  # log as round 0
 
@@ -362,17 +394,18 @@ def _run_one_time_calibration(participants: List[str]) -> None:
         Xs, ys = fl_core.arrays_from_b64(SHARD_PAYLOADS["server"][0])
         with LOCK:
             TASK_STATUS["server"]["status"] = "claimed"
-            TASK_STATUS["server"]["start"]  = time.perf_counter()
+            TASK_STATUS["server"]["start"] = time.perf_counter()
         threading.Thread(
             target=_server_train_on_shard,
             args=(GLOBAL_WEIGHTS, Xs, ys, 1, LOCAL_BATCH),
-            daemon=True
+            daemon=True,
         ).start()
 
     # Wait for everyone (all entries in TASK_STATUS)
     while True:
         with LOCK:
-            done = sum(1 for s in TASK_STATUS.values() if s["status"] == "done")
+            done = sum(1 for s in TASK_STATUS.values()
+                       if s["status"] == "done")
             need = len(TASK_STATUS)
         if done >= need:
             break
@@ -382,7 +415,8 @@ def _run_one_time_calibration(participants: List[str]) -> None:
     with LOCK:
         ROUND_IS_OPEN = False
         print("[SRV] calibration done | " + " | ".join(
-            f"{cid}: thr={SAMPLES_PER_SEC[cid]:.1f} samp/s" for cid in participants
+            f"{cid}: thr={SAMPLES_PER_SEC[cid]:.1f} samp/s"
+            for cid in participants
             if cid in SAMPLES_PER_SEC
         ))
 
@@ -407,7 +441,9 @@ def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
     raise ValueError(f"Unknown AGG_MODE: {AGG_MODE}")
 
 
-def _test_benchmark_aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> Tuple[float, str]:
+def _test_benchmark_aggregate(
+    updates: List[Tuple[List[np.ndarray], int]]
+) -> Tuple[float, str]:
     """
     Run the *other* aggregation backend purely for timing comparison.
 
@@ -417,7 +453,8 @@ def _test_benchmark_aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> Tu
     - Returns (elapsed_seconds, backend_name).
     """
     if not updates:
-        raise ValueError("No client updates provided to _test_benchmark_aggregate().")
+        raise ValueError("No client updates provided to "
+                         "_test_benchmark_aggregate().")
 
     t0 = time.perf_counter()
     if USE_GPU_AGG:
@@ -434,7 +471,8 @@ def _test_benchmark_aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> Tu
 
 # ======================== Orchestration loop ========================
 def run_rounds():
-    global ROUND_NUM, ROUND_IS_OPEN, GLOBAL_WEIGHTS, SHARD_PAYLOADS, TASK_STATUS, TRAINING_IS_DONE, STICKY_SPLITS
+    global ROUND_NUM, ROUND_IS_OPEN, GLOBAL_WEIGHTS
+    global SHARD_PAYLOADS, TASK_STATUS, TRAINING_IS_DONE, STICKY_SPLITS
 
     _ensure_global_weights()
 
@@ -443,11 +481,13 @@ def run_rounds():
     t_wait = time.perf_counter()
     while True:
         with LOCK:
-            ready = [c for c, info in ACTIVE_CLIENTS.items() if info.get("connected")]
+            ready = [c for c, info in ACTIVE_CLIENTS.items()
+                     if info.get("connected")]
         if len(ready) >= MIN_CLIENTS:
             break
         time.sleep(0.3)
-    print(f"[SRV] clients ready: {len(ready)} in {time.perf_counter() - t_wait:.2f}s")
+    print(f"[SRV] clients ready: {len(ready)} in "
+          f"{time.perf_counter() - t_wait:.2f}s")
 
     with LOCK:
         participants = [*ACTIVE_CLIENTS.keys()]
@@ -458,14 +498,19 @@ def run_rounds():
     if SPLIT_MODE == "sticky_calibrated":
         _run_one_time_calibration(participants)
         sizes = _sizes_from_speed(participants)
-        STICKY_SPLITS = _build_stratified_indices(participants, sizes, seed=1234)
+        STICKY_SPLITS = _build_stratified_indices(participants,
+                                                  sizes,
+                                                  seed=1234)
     elif SPLIT_MODE == "sticky_equal":
-        equal = {pid: X_train_all.shape[0] // len(participants) for pid in participants}
+        equal = {pid: X_train_all.shape[0] // len(participants)
+                 for pid in participants}
         # hand out remainder rows
         rem = X_train_all.shape[0] - sum(equal.values())
         for j in range(rem):
             equal[participants[j % len(participants)]] += 1
-        STICKY_SPLITS = _build_stratified_indices(participants, equal, seed=1234)
+        STICKY_SPLITS = _build_stratified_indices(participants,
+                                                  equal,
+                                                  seed=1234)
         # assume equal speed initially
         for pid in participants:
             SAMPLES_PER_SEC[pid] = 1.0
@@ -476,11 +521,13 @@ def run_rounds():
         STICKY_SPLITS = None
 
     if STICKY_SPLITS is not None:
-        print("[SRV] sticky shard sizes: " + " | ".join(f"{p}: {STICKY_SPLITS[p].size}" for p in participants))
+        print("[SRV] sticky shard sizes: " + " | ".join(
+            f"{p}: {STICKY_SPLITS[p].size}" for p in participants
+        ))
 
     t_total = time.perf_counter()
     total_train_s = 0.0   # sum of per-round training times (server+clients+agg, no eval)
-    total_eval_s  = 0.0   # sum of per-round eval times (+ final eval at the end)
+    total_eval_s = 0.0    # sum of per-round eval times (+ final eval at the end)
 
     # Early stopping tracking
     best_metric: Optional[float] = None
@@ -503,21 +550,27 @@ def run_rounds():
                 for pid in participants:
                     idxs = STICKY_SPLITS[pid]
                     Xp, yp = X_train_all[idxs], y_train_all[idxs]
-                    SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp), int(Xp.shape[0]))
-                    TASK_STATUS[pid]    = {"status": "pending", "n": int(Xp.shape[0])}
+                    SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp),
+                                           int(Xp.shape[0]))
+                    TASK_STATUS[pid] = {"status": "pending",
+                                        "n": int(Xp.shape[0])}
                 ROUND_IS_OPEN = True
                 start_weights_this_round = GLOBAL_WEIGHTS
         else:
-            # Adaptive: compute sizes from current speeds → make a fresh stratified split
-            sizes_now   = _sizes_from_speed(participants)
-            splits_now  = _build_stratified_indices(participants, sizes_now, seed=1000 + ROUND_NUM)
+            # Adaptive: compute sizes from current speeds → fresh stratified split
+            sizes_now = _sizes_from_speed(participants)
+            splits_now = _build_stratified_indices(participants,
+                                                   sizes_now,
+                                                   seed=1000 + ROUND_NUM)
             with LOCK:
                 SHARD_PAYLOADS = {}
                 for pid in participants:
                     idxs = splits_now[pid]
                     Xp, yp = X_train_all[idxs], y_train_all[idxs]
-                    SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp), int(Xp.shape[0]))
-                    TASK_STATUS[pid]    = {"status": "pending", "n": int(Xp.shape[0])}
+                    SHARD_PAYLOADS[pid] = (fl_core.arrays_to_b64(Xp, yp),
+                                           int(Xp.shape[0]))
+                    TASK_STATUS[pid] = {"status": "pending",
+                                        "n": int(Xp.shape[0])}
                 ROUND_IS_OPEN = True
                 start_weights_this_round = GLOBAL_WEIGHTS
 
@@ -530,17 +583,22 @@ def run_rounds():
             Xs, ys = fl_core.arrays_from_b64(SHARD_PAYLOADS["server"][0])
             with LOCK:
                 TASK_STATUS["server"]["status"] = "claimed"
-                TASK_STATUS["server"]["start"]  = time.perf_counter()
+                TASK_STATUS["server"]["start"] = time.perf_counter()
             threading.Thread(
                 target=_server_train_on_shard,
-                args=(start_weights_this_round, Xs, ys, LOCAL_EPOCHS, LOCAL_BATCH),
-                daemon=True
+                args=(start_weights_this_round,
+                      Xs,
+                      ys,
+                      LOCAL_EPOCHS,
+                      LOCAL_BATCH),
+                daemon=True,
             ).start()
 
         # 3) Wait for all participants of this round to finish training
         while True:
             with LOCK:
-                done = sum(1 for s in TASK_STATUS.values() if s["status"] == "done")
+                done = sum(1 for s in TASK_STATUS.values()
+                           if s["status"] == "done")
                 need = len(TASK_STATUS)
             if done >= need:
                 break
@@ -550,9 +608,9 @@ def run_rounds():
         t_agg = time.perf_counter()
         with LOCK:
             updates_list = list(CLIENT_UPDATES.values())
-            new_weights  = _aggregate(updates_list)
+            new_weights = _aggregate(updates_list)
             GLOBAL_WEIGHTS = new_weights
-            ROUND_IS_OPEN  = False
+            ROUND_IS_OPEN = False
             summary = " | ".join(
                 f"{cid}:n={st['n']},t={st.get('train_s', 0):.2f}s"
                 for cid, st in TASK_STATUS.items()
@@ -566,7 +624,8 @@ def run_rounds():
 
         print(
             f"[SRV][R{ROUND_NUM}] agg={agg_s:.2f}s | "
-            f"train_round={round_train_s:.2f}s (server+clients+agg, no eval)"
+            f"train_round={round_train_s:.2f}s "
+            f"(server+clients+agg, no eval)"
         )
         print(f"[SRV][R{ROUND_NUM}] hosts {{ {summary} }}")
 
@@ -576,9 +635,12 @@ def run_rounds():
         if TEST_BENCHMARK:
             with LOCK:
                 updates_list_bench = list(CLIENT_UPDATES.values())
-            bench_s, bench_backend = _test_benchmark_aggregate(updates_list_bench)
+            bench_s, bench_backend = _test_benchmark_aggregate(
+                updates_list_bench
+            )
             print(
-                f"[SRV][R{ROUND_NUM}] benchmark agg({bench_backend})={bench_s:.4f}s "
+                f"[SRV][R{ROUND_NUM}] benchmark agg({bench_backend})="
+                f"{bench_s:.4f}s "
                 f"(NOT used for GLOBAL_WEIGHTS; not counted in train_round)"
             )
 
@@ -595,16 +657,32 @@ def run_rounds():
         total_eval_s += eval_s
 
         print(
-            f"[SRV][R{ROUND_NUM}] eval: loss={loss:.4f}, acc={acc:.4f}, "
-            f"eval_time={eval_s:.2f}s"
+            f"[SRV][R{ROUND_NUM}] eval: loss={loss:.4f}, "
+            f"acc={acc:.4f}, eval_time={eval_s:.2f}s"
         )
 
-        # Optional detailed metrics for the cyber-threat dataset every 5 rounds
+        # Dataset-specific detailed metrics every 5 rounds
         if fl_core.DATASET_TYPE == "cyber_threat" and (ROUND_NUM % 5 == 0):
             try:
-                fl_core.print_cyber_threat_metrics(eval_model, X_test, y_test, ROUND_NUM)
+                fl_core.print_cyber_threat_metrics(
+                    eval_model, X_test, y_test, ROUND_NUM
+                )
             except Exception as e:
-                print(f"[SRV][R{ROUND_NUM}] detailed cyber metrics failed: {e}")
+                print(
+                    f"[SRV][R{ROUND_NUM}] detailed cyber metrics "
+                    f"failed: {e}"
+                )
+
+        if fl_core.DATASET_TYPE == "network_traffic" and (ROUND_NUM % 5 == 0):
+            try:
+                fl_core.print_network_traffic_metrics(
+                    eval_model, X_test, y_test, ROUND_NUM
+                )
+            except Exception as e:
+                print(
+                    f"[SRV][R{ROUND_NUM}] detailed network metrics "
+                    f"failed: {e}"
+                )
 
         # 7) Early stopping check (server-side, based on eval metric)
         if EARLY_STOP_ENABLED:
@@ -634,23 +712,29 @@ def run_rounds():
                     best_weights = [w.copy() for w in GLOBAL_WEIGHTS]
                     rounds_without_improve = 0
                     print(
-                        f"[SRV][R{ROUND_NUM}] early-stop monitor improved: "
+                        f"[SRV][R{ROUND_NUM}] early-stop monitor "
+                        f"improved: "
                         f"{EARLY_STOP_MONITOR}={best_metric:.4f}"
                     )
                 else:
                     rounds_without_improve += 1
                     print(
-                        f"[SRV][R{ROUND_NUM}] no {EARLY_STOP_MONITOR} improvement "
-                        f"({rounds_without_improve}/{EARLY_STOP_PATIENCE})"
+                        f"[SRV][R{ROUND_NUM}] no {EARLY_STOP_MONITOR} "
+                        f"improvement "
+                        f"({rounds_without_improve}/"
+                        f"{EARLY_STOP_PATIENCE})"
                     )
                     if rounds_without_improve >= EARLY_STOP_PATIENCE:
                         print(
-                            f"[SRV] early stopping triggered at round {ROUND_NUM} "
-                            f"(best {EARLY_STOP_MONITOR}={best_metric:.4f} at R{best_round})"
+                            f"[SRV] early stopping triggered at round "
+                            f"{ROUND_NUM} "
+                            f"(best {EARLY_STOP_MONITOR}="
+                            f"{best_metric:.4f} at R{best_round})"
                         )
                         # Restore best weights seen so far
                         if best_weights is not None:
-                            GLOBAL_WEIGHTS = [w.copy() for w in best_weights]
+                            GLOBAL_WEIGHTS = [w.copy()
+                                              for w in best_weights]
                         break  # break out of the main rounds loop
 
     with LOCK:
@@ -669,9 +753,12 @@ def run_rounds():
     rounds_ran = ROUND_NUM  # last round index actually executed
 
     print(
-        f"\n[SRV] done | rounds_run={rounds_ran} (requested={TOTAL_ROUNDS}) | "
-        f"train_total={total_train_s/60:.2f} min (all rounds: server+clients+agg, no eval) | "
-        f"eval_total={total_eval_s:.2f}s (per-round + final eval) | "
+        f"\n[SRV] done | rounds_run={rounds_ran} "
+        f"(requested={TOTAL_ROUNDS}) | "
+        f"train_total={total_train_s/60:.2f} min "
+        f"(all rounds: server+clients+agg, no eval) | "
+        f"eval_total={total_eval_s:.2f}s "
+        f"(per-round + final eval) | "
         f"wall={total_wall_s/60:.2f} min (overall wall-clock) | "
         f"acc={acc:.4f}"
     )
@@ -681,6 +768,7 @@ def run_rounds():
 def _run_api():
     # threaded=True lets multiple clients hit the server concurrently
     app.run(host="0.0.0.0", port=5000, threaded=True, use_reloader=False)
+
 
 if __name__ == "__main__":
     api_thread = threading.Thread(target=_run_api, daemon=True)
