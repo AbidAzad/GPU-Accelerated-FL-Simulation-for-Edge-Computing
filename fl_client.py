@@ -121,6 +121,23 @@ def main() -> None:
             X, y = fl_core.arrays_from_b64(shard_b64)
             cached_X, cached_y = X, y
 
+        # For network_traffic + network_mlp, infer input dim from this shard
+        if (
+            getattr(fl_core, "MODEL_TYPE", None) == "network_mlp"
+            and getattr(fl_core, "DATASET_TYPE", None) == "network_traffic"
+        ):
+            # If NETWORK_INPUT_DIM isn't set yet, set it from X
+            if getattr(fl_core, "NETWORK_INPUT_DIM", None) in (None, 0):
+                fl_core.NETWORK_INPUT_DIM = X.shape[1]
+
+        # -------------------
+        # Build local model ONCE per client
+        # -------------------
+        if model is None:
+            num_classes = y.shape[1]
+            model = fl_core.build_model(num_classes)
+            fl_core.prime_model(model)
+
         # -------------------
         # Build local model ONCE per client
         # -------------------

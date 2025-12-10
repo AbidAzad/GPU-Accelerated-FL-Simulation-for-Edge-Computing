@@ -31,7 +31,7 @@ SPLIT_MODE: str = "sticky_calibrated"
 MIN_CLIENTS: int = 4
 
 # Warm-up (only for "sticky_calibrated")
-CALIB_SAMPLES_PER_HOST: int = 3000
+CALIB_SAMPLES_PER_HOST: int = 5000
 CALIB_MIN_SAMPLES: int = 512
 SPEED_EMA_BETA: float = 0.7      # smoothing after real rounds
 
@@ -51,10 +51,10 @@ AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9  # reserved for future FedAvgM / momentum variants
 
 # Whether to use GPU-based aggregator (CUDA) instead of pure CPU NumPy
-USE_GPU_AGG: bool = False  # safer default; flip to True once libfedavg_gpu is ready
+USE_GPU_AGG: bool = True  # safer default; flip to True once libfedavg_gpu is ready
 
 # TEST AGGREGATION BENCHMARK FLAG
-TEST_BENCHMARK: bool = False  # only can be done with GPU servers
+TEST_BENCHMARK: bool = True  # only can be done with GPU servers
 
 # ---------------- Early stopping (server-side) ----------------
 EARLY_STOP_ENABLED: bool    = True    # flip to False to disable
