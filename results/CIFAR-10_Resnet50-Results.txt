@@ -1,0 +1,467 @@
+[SRV] prepping data...
+ * Serving Flask app 'fl_server'
+ * Debug mode: off
+[SRV] waiting for clients...
+[SRV] clients ready: 4 in 35.13s
+[SRV] calibration start...
+[SRV][R0] -> client2: n=5000
+[SRV][R0] -> client4: n=5000
+[SRV][R0] -> client3: n=5000
+[SRV][R0] -> client1: n=5000
+[SRV][R0] <- client3: n=5000, train=178.83s
+[SRV][R0] <- client4: n=5000, train=217.75s
+[SRV][R0] <- client1: n=5000, train=227.65s
+[SRV][R0] <- client2: n=5000, train=270.05s
+[SRV] calibration done | client3: thr=28.0 samp/s | client2: thr=18.5 samp/s | client1: thr=22.0 samp/s | client4: thr=23.0 samp/s
+[SRV] sticky shard sizes: client3: 15301 | client2: 10128 | client1: 12015 | client4: 12556
+
+[SRV][R1] start
+[SRV][R1] -> client2: n=10128
+[SRV][R1] -> client4: n=12556
+[SRV][R1] -> client1: n=12015
+[SRV][R1] -> client3: n=15301
+[SRV][R1] <- client3: n=15301, train=450.30s
+[SRV][R1] <- client2: n=10128, train=482.61s
+[SRV][R1] <- client1: n=12015, train=482.02s
+[SRV][R1] <- client4: n=12556, train=503.07s
+
+[AGG] GPU is being used for aggregation.
+[fedavg_gpu] (re)allocated device buffers: clients=4, vec_len=24641930 (bytes: clients=394270880, counts=16, out=98567720)
+[SRV][R1] agg=0.37961s | train_round=507.60s (server+clients+agg, no eval)
+[SRV][R1] hosts { client3:n=15301,t=450.30s | client2:n=10128,t=482.61s | client1:n=12015,t=482.02s | client4:n=12556,t=503.07s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R1] benchmark agg(cpu)=0.39212s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R1] eval: loss=2.3026, acc=0.1000, eval_time=14.40s
+[SRV][R1] early-stop baseline: acc=0.1000
+
+[SRV][R2] start
+[SRV][R2] -> client3: n=15301 (cached shard)
+[SRV][R2] -> client2: n=10128 (cached shard)
+[SRV][R2] -> client1: n=12015 (cached shard)
+[SRV][R2] -> client4: n=12556 (cached shard)
+[SRV][R2] <- client3: n=15301, train=423.47s
+[SRV][R2] <- client1: n=12015, train=459.18s
+[SRV][R2] <- client2: n=10128, train=476.13s
+[SRV][R2] <- client4: n=12556, train=479.15s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R2] agg=0.27504s | train_round=491.60s (server+clients+agg, no eval)
+[SRV][R2] hosts { client3:n=15301,t=423.47s | client2:n=10128,t=476.13s | client1:n=12015,t=459.18s | client4:n=12556,t=479.15s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R2] benchmark agg(cpu)=0.38025s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R2] eval: loss=2.3029, acc=0.1002, eval_time=14.66s
+[SRV][R2] no acc improvement (1/5)
+
+[SRV][R3] start
+[SRV][R3] -> client1: n=12015 (cached shard)
+[SRV][R3] -> client3: n=15301 (cached shard)
+[SRV][R3] -> client4: n=12556 (cached shard)
+[SRV][R3] -> client2: n=10128 (cached shard)
+[SRV][R3] <- client3: n=15301, train=428.69s
+[SRV][R3] <- client1: n=12015, train=440.17s
+[SRV][R3] <- client2: n=10128, train=466.94s
+[SRV][R3] <- client4: n=12556, train=476.02s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R3] agg=0.31787s | train_round=484.31s (server+clients+agg, no eval)
+[SRV][R3] hosts { client3:n=15301,t=428.69s | client2:n=10128,t=466.94s | client1:n=12015,t=440.17s | client4:n=12556,t=476.02s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R3] benchmark agg(cpu)=0.38308s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R3] eval: loss=2.1661, acc=0.1801, eval_time=14.54s
+[SRV][R3] early-stop monitor improved: acc=0.1801
+
+[SRV][R4] start
+[SRV][R4] -> client4: n=12556 (cached shard)
+[SRV][R4] -> client1: n=12015 (cached shard)
+[SRV][R4] -> client2: n=10128 (cached shard)
+[SRV][R4] -> client3: n=15301 (cached shard)
+[SRV][R4] <- client3: n=15301, train=432.37s
+[SRV][R4] <- client1: n=12015, train=461.00s
+[SRV][R4] <- client4: n=12556, train=472.19s
+[SRV][R4] <- client2: n=10128, train=467.54s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R4] agg=0.38791s | train_round=476.00s (server+clients+agg, no eval)
+[SRV][R4] hosts { client3:n=15301,t=432.37s | client2:n=10128,t=467.54s | client1:n=12015,t=461.00s | client4:n=12556,t=472.19s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R4] benchmark agg(cpu)=0.40961s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R4] eval: loss=1.8333, acc=0.3167, eval_time=15.56s
+[SRV][R4] early-stop monitor improved: acc=0.3167
+
+[SRV][R5] start
+[SRV][R5] -> client2: n=10128 (cached shard)
+[SRV][R5] -> client4: n=12556 (cached shard)
+[SRV][R5] -> client3: n=15301 (cached shard)
+[SRV][R5] -> client1: n=12015 (cached shard)
+185.243.96.116 - - [10/Dec/2025 02:02:47] code 400, message Bad request syntax ('\x03\x00\x00\x13\x0eà\x00\x00\x00\x00\x00\x01\x00\x08\x00')
+[SRV][R5] <- client3: n=15301, train=438.69s
+[SRV][R5] <- client2: n=10128, train=461.38s
+[SRV][R5] <- client1: n=12015, train=458.72s
+[SRV][R5] <- client4: n=12556, train=480.30s
+[AGG] GPU is being used for aggregation.
+
+[SRV][R5] agg=0.36908s | train_round=484.53s (server+clients+agg, no eval)
+[SRV][R5] hosts { client3:n=15301,t=438.69s | client2:n=10128,t=461.38s | client1:n=12015,t=458.72s | client4:n=12556,t=480.30s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R5] benchmark agg(cpu)=0.37560s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R5] eval: loss=1.6603, acc=0.3671, eval_time=15.38s
+[SRV][R5] early-stop monitor improved: acc=0.3671
+
+[SRV][R6] start
+[SRV][R6] -> client3: n=15301 (cached shard)
+[SRV][R6] -> client2: n=10128 (cached shard)
+[SRV][R6] -> client1: n=12015 (cached shard)
+[SRV][R6] -> client4: n=12556 (cached shard)
+185.243.96.116 - - [10/Dec/2025 02:15:51] code 400, message Bad request syntax ('\x03\x00\x00\x13\x0eà\x00\x00\x00\x00\x00\x01\x00\x08\x00')
+[SRV][R6] <- client3: n=15301, train=424.44s
+[SRV][R6] <- client2: n=10128, train=469.61s
+[SRV][R6] <- client1: n=12015, train=469.32s
+[SRV][R6] <- client4: n=12556, train=481.92s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R6] agg=0.36534s | train_round=494.40s (server+clients+agg, no eval)
+[SRV][R6] hosts { client3:n=15301,t=424.44s | client2:n=10128,t=469.61s | client1:n=12015,t=469.32s | client4:n=12556,t=481.92s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R6] benchmark agg(cpu)=0.40038s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R6] eval: loss=1.8194, acc=0.3483, eval_time=14.91s
+[SRV][R6] no acc improvement (1/5)
+
+[SRV][R7] start
+[SRV][R7] -> client1: n=12015 (cached shard)
+[SRV][R7] -> client3: n=15301 (cached shard)
+[SRV][R7] -> client2: n=10128 (cached shard)
+[SRV][R7] -> client4: n=12556 (cached shard)
+[SRV][R7] <- client3: n=15301, train=430.26s
+[SRV][R7] <- client1: n=12015, train=449.74s
+[SRV][R7] <- client2: n=10128, train=473.20s
+[SRV][R7] <- client4: n=12556, train=477.17s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R7] agg=0.49133s | train_round=489.77s (server+clients+agg, no eval)
+[SRV][R7] hosts { client3:n=15301,t=430.26s | client2:n=10128,t=473.20s | client1:n=12015,t=449.74s | client4:n=12556,t=477.17s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R7] benchmark agg(cpu)=0.38337s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R7] eval: loss=1.6037, acc=0.4094, eval_time=16.24s
+[SRV][R7] early-stop monitor improved: acc=0.4094
+
+[SRV][R8] start
+[SRV][R8] -> client2: n=10128 (cached shard)
+[SRV][R8] -> client1: n=12015 (cached shard)
+[SRV][R8] -> client4: n=12556 (cached shard)
+[SRV][R8] -> client3: n=15301 (cached shard)
+[SRV][R8] <- client3: n=15301, train=434.73s
+[SRV][R8] <- client2: n=10128, train=460.30s
+[SRV][R8] <- client1: n=12015, train=463.88s
+[SRV][R8] <- client4: n=12556, train=482.43s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R8] agg=0.49646s | train_round=490.93s (server+clients+agg, no eval)
+[SRV][R8] hosts { client3:n=15301,t=434.73s | client2:n=10128,t=460.30s | client1:n=12015,t=463.88s | client4:n=12556,t=482.43s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R8] benchmark agg(cpu)=0.37015s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R8] eval: loss=1.4755, acc=0.4583, eval_time=15.52s
+[SRV][R8] early-stop monitor improved: acc=0.4583
+
+[SRV][R9] start
+[SRV][R9] -> client3: n=15301 (cached shard)
+[SRV][R9] -> client1: n=12015 (cached shard)
+[SRV][R9] -> client4: n=12556 (cached shard)
+[SRV][R9] -> client2: n=10128 (cached shard)
+[SRV][R9] <- client3: n=15301, train=425.47s
+[SRV][R9] <- client1: n=12015, train=457.41s
+[SRV][R9] <- client2: n=10128, train=466.24s
+[SRV][R9] <- client4: n=12556, train=483.11s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R9] agg=0.50596s | train_round=491.77s (server+clients+agg, no eval)
+[SRV][R9] hosts { client3:n=15301,t=425.47s | client2:n=10128,t=466.24s | client1:n=12015,t=457.41s | client4:n=12556,t=483.11s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R9] benchmark agg(cpu)=0.39442s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R9] eval: loss=1.4839, acc=0.4638, eval_time=16.11s
+[SRV][R9] early-stop monitor improved: acc=0.4638
+
+[SRV][R10] start
+[SRV][R10] -> client1: n=12015 (cached shard)
+[SRV][R10] -> client4: n=12556 (cached shard)
+[SRV][R10] -> client2: n=10128 (cached shard)
+[SRV][R10] -> client3: n=15301 (cached shard)
+[SRV][R10] <- client3: n=15301, train=436.41s
+[SRV][R10] <- client1: n=12015, train=448.76s
+[SRV][R10] <- client2: n=10128, train=472.16s
+[SRV][R10] <- client4: n=12556, train=485.69s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R10] agg=0.40068s | train_round=489.99s (server+clients+agg, no eval)
+[SRV][R10] hosts { client3:n=15301,t=436.41s | client2:n=10128,t=472.16s | client1:n=12015,t=448.76s | client4:n=12556,t=485.69s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R10] benchmark agg(cpu)=0.38133s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R10] eval: loss=1.6707, acc=0.4140, eval_time=15.17s
+[SRV][R10] no acc improvement (1/5)
+
+[SRV][R11] start
+[SRV][R11] -> client2: n=10128 (cached shard)
+[SRV][R11] -> client3: n=15301 (cached shard)
+[SRV][R11] -> client4: n=12556 (cached shard)
+[SRV][R11] -> client1: n=12015 (cached shard)
+3.149.59.26 - - [10/Dec/2025 02:58:29] code 400, message Bad request version ('À\x14À')
+3.149.59.26 - - [10/Dec/2025 02:59:16] code 400, message Bad request syntax ('SSH-2.0-Go')
+3.149.59.26 - - [10/Dec/2025 03:00:49] code 400, message Bad request syntax ('\x16\x03\x01\x00{\x01\x00\x00w\x03\x03ÁV6')
+[SRV][R11] <- client3: n=15301, train=441.61s
+[SRV][R11] <- client2: n=10128, train=465.32s
+[SRV][R11] <- client1: n=12015, train=456.14s
+[SRV][R11] <- client4: n=12556, train=483.86s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R11] agg=0.46532s | train_round=492.34s (server+clients+agg, no eval)
+[SRV][R11] hosts { client3:n=15301,t=441.61s | client2:n=10128,t=465.32s | client1:n=12015,t=456.14s | client4:n=12556,t=483.86s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R11] benchmark agg(cpu)=0.37248s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R11] eval: loss=1.4777, acc=0.4723, eval_time=16.13s
+[SRV][R11] early-stop monitor improved: acc=0.4723
+
+[SRV][R12] start
+[SRV][R12] -> client1: n=12015 (cached shard)
+[SRV][R12] -> client3: n=15301 (cached shard)
+[SRV][R12] -> client4: n=12556 (cached shard)
+[SRV][R12] -> client2: n=10128 (cached shard)
+[SRV][R12] <- client3: n=15301, train=429.18s
+[SRV][R12] <- client1: n=12015, train=458.75s
+[SRV][R12] <- client2: n=10128, train=468.17s
+[SRV][R12] <- client4: n=12556, train=478.63s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R12] agg=0.35492s | train_round=487.20s (server+clients+agg, no eval)
+[SRV][R12] hosts { client3:n=15301,t=429.18s | client2:n=10128,t=468.17s | client1:n=12015,t=458.75s | client4:n=12556,t=478.63s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R12] benchmark agg(cpu)=0.36755s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R12] eval: loss=1.8032, acc=0.3880, eval_time=15.46s
+[SRV][R12] no acc improvement (1/5)
+
+[SRV][R13] start
+[SRV][R13] -> client1: n=12015 (cached shard)
+[SRV][R13] -> client4: n=12556 (cached shard)
+[SRV][R13] -> client3: n=15301 (cached shard)
+[SRV][R13] -> client2: n=10128 (cached shard)
+176.65.148.229 - - [10/Dec/2025 03:17:40] code 400, message Bad request version ('À\x13À')
+176.65.148.229 - - [10/Dec/2025 03:17:40] code 400, message Bad request syntax ('1111\x88\x00\x00\x00\x01\x01\x00\x00\x00%\xad\x11>')
+176.65.148.229 - - [10/Dec/2025 03:17:40] code 400, message Bad request version ('encoding="UTF-8"?>')
+176.65.148.229 - - [10/Dec/2025 03:17:41] code 400, message Bad request syntax ('1111\x88\x00\x00\x00\x01\x01\x00\x00\x00%\xad\x11>')
+176.65.148.229 - - [10/Dec/2025 03:17:42] code 400, message Bad request syntax ('1111\x88\x00\x00\x00\x01\x01\x00\x00\x00%\xad\x11>')
+[SRV][R13] <- client3: n=15301, train=434.28s
+[SRV][R13] <- client1: n=12015, train=449.30s
+[SRV][R13] <- client2: n=10128, train=469.81s
+[SRV][R13] <- client4: n=12556, train=481.40s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R13] agg=0.37027s | train_round=485.70s (server+clients+agg, no eval)
+[SRV][R13] hosts { client3:n=15301,t=434.28s | client2:n=10128,t=469.81s | client1:n=12015,t=449.30s | client4:n=12556,t=481.40s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R13] benchmark agg(cpu)=0.37276s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R13] eval: loss=1.5006, acc=0.4804, eval_time=16.18s
+[SRV][R13] early-stop monitor improved: acc=0.4804
+
+[SRV][R14] start
+[SRV][R14] -> client1: n=12015 (cached shard)
+[SRV][R14] -> client3: n=15301 (cached shard)
+[SRV][R14] -> client2: n=10128 (cached shard)
+[SRV][R14] -> client4: n=12556 (cached shard)
+[SRV][R14] <- client3: n=15301, train=427.81s
+[SRV][R14] <- client1: n=12015, train=440.59s
+[SRV][R14] <- client2: n=10128, train=469.90s
+[SRV][R14] <- client4: n=12556, train=476.21s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R14] agg=0.28409s | train_round=488.69s (server+clients+agg, no eval)
+[SRV][R14] hosts { client3:n=15301,t=427.81s | client2:n=10128,t=469.90s | client1:n=12015,t=440.59s | client4:n=12556,t=476.21s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R14] benchmark agg(cpu)=0.37851s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R14] eval: loss=1.3638, acc=0.5150, eval_time=15.00s
+[SRV][R14] early-stop monitor improved: acc=0.5150
+
+[SRV][R15] start
+[SRV][R15] -> client2: n=10128 (cached shard)
+[SRV][R15] -> client4: n=12556 (cached shard)
+[SRV][R15] -> client1: n=12015 (cached shard)
+[SRV][R15] -> client3: n=15301 (cached shard)
+[SRV][R15] <- client3: n=15301, train=428.09s
+[SRV][R15] <- client2: n=10128, train=463.43s
+[SRV][R15] <- client1: n=12015, train=460.53s
+[SRV][R15] <- client4: n=12556, train=481.73s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R15] agg=0.45987s | train_round=486.10s (server+clients+agg, no eval)
+[SRV][R15] hosts { client3:n=15301,t=428.09s | client2:n=10128,t=463.43s | client1:n=12015,t=460.53s | client4:n=12556,t=481.73s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R15] benchmark agg(cpu)=0.38004s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R15] eval: loss=1.2893, acc=0.5411, eval_time=16.13s
+[SRV][R15] early-stop monitor improved: acc=0.5411
+
+[SRV][R16] start
+[SRV][R16] -> client4: n=12556 (cached shard)
+[SRV][R16] -> client1: n=12015 (cached shard)
+[SRV][R16] -> client3: n=15301 (cached shard)
+[SRV][R16] -> client2: n=10128 (cached shard)
+[SRV][R16] <- client3: n=15301, train=430.84s
+[SRV][R16] <- client1: n=12015, train=459.67s
+[SRV][R16] <- client4: n=12556, train=470.93s
+[SRV][R16] <- client2: n=10128, train=472.18s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R16] agg=0.42755s | train_round=485.12s (server+clients+agg, no eval)
+[SRV][R16] hosts { client3:n=15301,t=430.84s | client2:n=10128,t=472.18s | client1:n=12015,t=459.67s | client4:n=12556,t=470.93s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R16] benchmark agg(cpu)=0.37971s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R16] eval: loss=1.4730, acc=0.4787, eval_time=15.23s
+[SRV][R16] no acc improvement (1/5)
+
+[SRV][R17] start
+[SRV][R17] -> client2: n=10128 (cached shard)
+[SRV][R17] -> client4: n=12556 (cached shard)
+[SRV][R17] -> client3: n=15301 (cached shard)
+[SRV][R17] -> client1: n=12015 (cached shard)
+[SRV][R17] <- client3: n=15301, train=431.10s
+[SRV][R17] <- client2: n=10128, train=457.72s
+[SRV][R17] <- client1: n=12015, train=455.19s
+[SRV][R17] <- client4: n=12556, train=480.92s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R17] agg=0.39701s | train_round=485.19s (server+clients+agg, no eval)
+[SRV][R17] hosts { client3:n=15301,t=431.10s | client2:n=10128,t=457.72s | client1:n=12015,t=455.19s | client4:n=12556,t=480.92s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R17] benchmark agg(cpu)=0.37688s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R17] eval: loss=1.5622, acc=0.4421, eval_time=16.25s
+[SRV][R17] no acc improvement (2/5)
+
+[SRV][R18] start
+[SRV][R18] -> client3: n=15301 (cached shard)
+[SRV][R18] -> client4: n=12556 (cached shard)
+[SRV][R18] -> client2: n=10128 (cached shard)
+[SRV][R18] -> client1: n=12015 (cached shard)
+[SRV][R18] <- client3: n=15301, train=430.93s
+[SRV][R18] <- client1: n=12015, train=455.30s
+[SRV][R18] <- client2: n=10128, train=466.87s
+[SRV][R18] <- client4: n=12556, train=474.06s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R18] agg=0.28979s | train_round=478.25s (server+clients+agg, no eval)
+[SRV][R18] hosts { client3:n=15301,t=430.93s | client2:n=10128,t=466.87s | client1:n=12015,t=455.30s | client4:n=12556,t=474.06s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R18] benchmark agg(cpu)=0.37717s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R18] eval: loss=1.1974, acc=0.5691, eval_time=16.65s
+[SRV][R18] early-stop monitor improved: acc=0.5691
+
+[SRV][R19] start
+[SRV][R19] -> client1: n=12015 (cached shard)
+[SRV][R19] -> client4: n=12556 (cached shard)
+[SRV][R19] -> client2: n=10128 (cached shard)
+[SRV][R19] -> client3: n=15301 (cached shard)
+[SRV][R19] <- client3: n=15301, train=430.80s
+[SRV][R19] <- client1: n=12015, train=454.37s
+[SRV][R19] <- client2: n=10128, train=471.86s
+[SRV][R19] <- client4: n=12556, train=476.13s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R19] agg=0.45789s | train_round=480.74s (server+clients+agg, no eval)
+[SRV][R19] hosts { client3:n=15301,t=430.80s | client2:n=10128,t=471.86s | client1:n=12015,t=454.37s | client4:n=12556,t=476.13s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R19] benchmark agg(cpu)=0.37647s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R19] eval: loss=1.6417, acc=0.4054, eval_time=15.90s
+[SRV][R19] no acc improvement (1/5)
+
+[SRV][R20] start
+[SRV][R20] -> client3: n=15301 (cached shard)
+[SRV][R20] -> client1: n=12015 (cached shard)
+[SRV][R20] -> client2: n=10128 (cached shard)
+[SRV][R20] -> client4: n=12556 (cached shard)
+[SRV][R20] <- client3: n=15301, train=422.60s
+[SRV][R20] <- client1: n=12015, train=456.17s
+[SRV][R20] <- client2: n=10128, train=466.74s
+[SRV][R20] <- client4: n=12556, train=478.50s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R20] agg=0.33492s | train_round=490.98s (server+clients+agg, no eval)
+[SRV][R20] hosts { client3:n=15301,t=422.60s | client2:n=10128,t=466.74s | client1:n=12015,t=456.17s | client4:n=12556,t=478.50s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R20] benchmark agg(cpu)=0.38125s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R20] eval: loss=1.5246, acc=0.4626, eval_time=16.74s
+[SRV][R20] no acc improvement (2/5)
+
+[SRV][R21] start
+[SRV][R21] -> client1: n=12015 (cached shard)
+[SRV][R21] -> client3: n=15301 (cached shard)
+[SRV][R21] -> client2: n=10128 (cached shard)
+[SRV][R21] -> client4: n=12556 (cached shard)
+[SRV][R21] <- client3: n=15301, train=434.97s
+[SRV][R21] <- client1: n=12015, train=449.87s
+[SRV][R21] <- client2: n=10128, train=471.06s
+[SRV][R21] <- client4: n=12556, train=477.31s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R21] agg=0.36270s | train_round=489.84s (server+clients+agg, no eval)
+[SRV][R21] hosts { client3:n=15301,t=434.97s | client2:n=10128,t=471.06s | client1:n=12015,t=449.87s | client4:n=12556,t=477.31s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R21] benchmark agg(cpu)=0.38057s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R21] eval: loss=1.4807, acc=0.4800, eval_time=15.91s
+[SRV][R21] no acc improvement (3/5)
+
+[SRV][R22] start
+[SRV][R22] -> client4: n=12556 (cached shard)
+[SRV][R22] -> client3: n=15301 (cached shard)
+[SRV][R22] -> client2: n=10128 (cached shard)
+[SRV][R22] -> client1: n=12015 (cached shard)
+[SRV][R22] <- client3: n=15301, train=434.51s
+[SRV][R22] <- client1: n=12015, train=456.00s
+[SRV][R22] <- client4: n=12556, train=472.36s
+[SRV][R22] <- client2: n=10128, train=467.10s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R22] agg=0.44809s | train_round=475.72s (server+clients+agg, no eval)
+[SRV][R22] hosts { client3:n=15301,t=434.51s | client2:n=10128,t=467.10s | client1:n=12015,t=456.00s | client4:n=12556,t=472.36s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R22] benchmark agg(cpu)=0.37786s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R22] eval: loss=1.3330, acc=0.5174, eval_time=16.39s
+[SRV][R22] no acc improvement (4/5)
+
+[SRV][R23] start
+[SRV][R23] -> client2: n=10128 (cached shard)
+[SRV][R23] -> client4: n=12556 (cached shard)
+[SRV][R23] -> client1: n=12015 (cached shard)
+[SRV][R23] -> client3: n=15301 (cached shard)
+[SRV][R23] <- client3: n=15301, train=432.30s
+[SRV][R23] <- client2: n=10128, train=459.29s
+[SRV][R23] <- client1: n=12015, train=460.57s
+[SRV][R23] <- client4: n=12556, train=485.82s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R23] agg=0.39710s | train_round=490.28s (server+clients+agg, no eval)
+[SRV][R23] hosts { client3:n=15301,t=432.30s | client2:n=10128,t=459.29s | client1:n=12015,t=460.57s | client4:n=12556,t=485.82s }
+
+[AGG] CPU is being used for aggregation.
+[SRV][R23] benchmark agg(cpu)=0.41640s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R23] eval: loss=1.3169, acc=0.5459, eval_time=17.03s
+[SRV][R23] no acc improvement (5/5)
+[SRV] early stopping triggered at round 23 (best acc=0.5691 at R18)
+
+[SRV] done | rounds_run=23 (requested=100) | train_total=186.95 min (all rounds: server+clients+agg, no eval) | eval_total=378.24s (per-round + final eval) | wall=204.81 min (overall wall-clock) | acc=0.5691
