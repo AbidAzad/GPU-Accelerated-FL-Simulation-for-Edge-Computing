@@ -182,7 +182,7 @@ def _build_lstm(num_classes: int):
     model.add(LSTM(150, dropout=0.2, recurrent_dropout=0.2))
     model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation="softmax"))
-    optimizer = tf.keras.optimizers.Adam()
+    optimizer = tf.keras.optimizers.SGD(momentum=0.9)
     _compile_for_federated(
         model,
         optimizer=optimizer,
@@ -214,7 +214,7 @@ def _build_cifar_resnet(num_classes: int):
         name="ResNet50_CIFAR10",
     )
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=CIFAR_LEARNING_RATE)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=CIFAR_LEARNING_RATE, momentum=0.9)
     _compile_for_federated(
         model,
         optimizer=optimizer,
@@ -248,7 +248,7 @@ def _build_network_mlp(num_classes: int):
 
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="NetworkTrafficMLP")
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=1e-3, momentum=0.9)
 
     _compile_for_federated(
         model,
