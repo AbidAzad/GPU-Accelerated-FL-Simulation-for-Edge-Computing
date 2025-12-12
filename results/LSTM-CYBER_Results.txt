@@ -1,0 +1,827 @@
+[SRV] prepping data...
+C:\Users\Abillou\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:97: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+ * Serving Flask app 'fl_server'
+ * Debug mode: off
+[SRV] waiting for clients...
+[SRV] clients ready: 4 in 48.94s
+[SRV] calibration start...
+[SRV][R0] -> client4: n=3988
+[SRV][R0] -> client3: n=3988
+[SRV][R0] -> client1: n=3988
+[SRV][R0] -> client2: n=3988
+[SRV][R0] <- client1: n=3988, train=51.06s
+[SRV][R0] <- client4: n=3988, train=53.26s
+[SRV][R0] <- client2: n=3988, train=50.70s
+[SRV][R0] <- client3: n=3988, train=54.18s
+[SRV] calibration done | client2: thr=78.7 samp/s | client3: thr=73.6 samp/s | client1: thr=78.1 samp/s | client4: thr=74.9 samp/s
+[SRV] sticky shard sizes: client2: 4118 | client3: 3846 | client1: 4081 | client4: 3907
+
+[SRV][R1] start
+[SRV][R1] -> client2: n=4118
+[SRV][R1] -> client4: n=3907
+[SRV][R1] -> client3: n=3846
+[SRV][R1] -> client1: n=4081
+[SRV][R1] <- client1: n=4081, train=40.41s
+[SRV][R1] <- client2: n=4118, train=45.88s
+[SRV][R1] <- client3: n=3846, train=47.28s
+[SRV][R1] <- client4: n=3907, train=49.27s
+
+[AGG] GPU is being used for aggregation.
+[fedavg_gpu] (re)allocated device buffers: clients=4, vec_len=5154073 (bytes: clients=82465168, counts=16, out=20616292)
+[SRV][R1] agg=0.20317s | train_round=50.32s (server+clients+agg, no eval)
+[SRV][R1] hosts { client2:n=4118,t=45.88s | client3:n=3846,t=47.28s | client1:n=4081,t=40.41s | client4:n=3907,t=49.27s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R1] benchmark agg(cpu)=0.08449s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R1] eval: loss=1.8582, acc=0.5015, eval_time=6.51s
+[SRV][R1] early-stop baseline: acc=0.5015
+
+[SRV][R2] start
+[SRV][R2] -> client3: n=3846 (cached shard)
+[SRV][R2] -> client4: n=3907 (cached shard)
+[SRV][R2] -> client2: n=4118 (cached shard)
+[SRV][R2] -> client1: n=4081 (cached shard)
+[SRV][R2] <- client2: n=4118, train=43.47s
+[SRV][R2] <- client3: n=3846, train=46.30s
+[SRV][R2] <- client1: n=4081, train=48.63s
+[SRV][R2] <- client4: n=3907, train=50.83s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R2] agg=0.32878s | train_round=51.99s (server+clients+agg, no eval)
+[SRV][R2] hosts { client2:n=4118,t=43.47s | client3:n=3846,t=46.30s | client1:n=4081,t=48.63s | client4:n=3907,t=50.83s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R2] benchmark agg(cpu)=0.08600s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R2] eval: loss=1.6235, acc=0.5346, eval_time=6.22s
+[SRV][R2] early-stop monitor improved: acc=0.5346
+
+[SRV][R3] start
+[SRV][R3] -> client4: n=3907 (cached shard)
+[SRV][R3] -> client2: n=4118 (cached shard)
+[SRV][R3] -> client3: n=3846 (cached shard)
+[SRV][R3] -> client1: n=4081 (cached shard)
+[SRV][R3] <- client2: n=4118, train=43.29s
+[SRV][R3] <- client1: n=4081, train=43.48s
+[SRV][R3] <- client3: n=3846, train=47.34s
+[SRV][R3] <- client4: n=3907, train=50.62s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R3] agg=0.05135s | train_round=50.87s (server+clients+agg, no eval)
+[SRV][R3] hosts { client2:n=4118,t=43.29s | client3:n=3846,t=47.34s | client1:n=4081,t=43.48s | client4:n=3907,t=50.62s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R3] benchmark agg(cpu)=0.08473s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R3] eval: loss=1.5105, acc=0.5547, eval_time=6.28s
+[SRV][R3] early-stop monitor improved: acc=0.5547
+
+[SRV][R4] start
+[SRV][R4] -> client3: n=3846 (cached shard)
+[SRV][R4] -> client2: n=4118 (cached shard)
+[SRV][R4] -> client4: n=3907 (cached shard)
+[SRV][R4] -> client1: n=4081 (cached shard)
+[SRV][R4] <- client2: n=4118, train=40.87s
+[SRV][R4] <- client3: n=3846, train=46.41s
+[SRV][R4] <- client4: n=3907, train=47.00s
+[SRV][R4] <- client1: n=4081, train=42.67s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R4] agg=0.24825s | train_round=71.69s (server+clients+agg, no eval)
+[SRV][R4] hosts { client2:n=4118,t=40.87s | client3:n=3846,t=46.41s | client1:n=4081,t=42.67s | client4:n=3907,t=47.00s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R4] benchmark agg(cpu)=0.08331s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R4] eval: loss=1.4319, acc=0.5785, eval_time=6.20s
+[SRV][R4] early-stop monitor improved: acc=0.5785
+
+[SRV][R5] start
+[SRV][R5] -> client1: n=4081 (cached shard)
+[SRV][R5] -> client2: n=4118 (cached shard)
+[SRV][R5] -> client4: n=3907 (cached shard)
+[SRV][R5] -> client3: n=3846 (cached shard)
+[SRV][R5] <- client2: n=4118, train=40.71s
+[SRV][R5] <- client1: n=4081, train=46.51s
+[SRV][R5] <- client4: n=3907, train=47.75s
+[SRV][R5] <- client3: n=3846, train=41.81s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R5] agg=0.19909s | train_round=58.84s (server+clients+agg, no eval)
+[SRV][R5] hosts { client2:n=4118,t=40.71s | client3:n=3846,t=41.81s | client1:n=4081,t=46.51s | client4:n=3907,t=47.75s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R5] benchmark agg(cpu)=0.09937s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R5] eval: loss=1.3117, acc=0.6249, eval_time=6.26s
+
+[SRV][R5] Detailed Classification Report:
+                precision    recall  f1-score   support
+
+        DOMAIN       0.00      0.00      0.00        10
+         EMAIL       0.00      0.00      0.00         5
+      FILEPATH       0.00      0.00      0.00        63
+          IPV4       0.00      0.00      0.00        12
+ Infrastucture       0.00      0.00      0.00         9
+           MD5       0.00      0.00      0.00         3
+   REGISTRYKEY       0.00      0.00      0.00         4
+          SHA1       0.00      0.00      0.00        12
+          SHA2       0.00      0.00      0.00        32
+      SOFTWARE       0.31      0.11      0.16       246
+          TIME       0.00      0.00      0.00        95
+           URL       0.00      0.00      0.00        25
+attack-pattern       0.52      0.27      0.35       241
+        benign       0.82      0.95      0.88      2000
+      campaign       0.00      0.00      0.00        26
+          hash       0.00      0.00      0.00         3
+      identity       0.32      0.44      0.37       233
+      location       0.35      0.41      0.38       281
+       malware       0.35      0.73      0.47       382
+  threat-actor       0.00      0.00      0.00       178
+         tools       0.00      0.00      0.00        78
+           url       0.00      0.00      0.00         1
+ vulnerability       0.00      0.00      0.00        49
+
+      accuracy                           0.62      3988
+     macro avg       0.12      0.13      0.11      3988
+  weighted avg       0.54      0.62      0.57      3988
+
+
+[SRV][R5] Threat Detection Summary:
+  Benign samples:     2000 (50.2%)
+  Malicious samples:  1988 (49.8%)
+  Benign accuracy:    95.30%
+  Malicious accuracy: 29.48%
+[SRV][R5] early-stop monitor improved: acc=0.6249
+
+[SRV][R6] start
+[SRV][R6] -> client1: n=4081 (cached shard)
+[SRV][R6] -> client3: n=3846 (cached shard)
+[SRV][R6] -> client2: n=4118 (cached shard)
+[SRV][R6] -> client4: n=3907 (cached shard)
+[SRV][R6] <- client1: n=4081, train=46.67s
+[SRV][R6] <- client2: n=4118, train=41.52s
+[SRV][R6] <- client3: n=3846, train=42.95s
+[SRV][R6] <- client4: n=3907, train=49.51s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R6] agg=0.22556s | train_round=73.50s (server+clients+agg, no eval)
+[SRV][R6] hosts { client2:n=4118,t=41.52s | client3:n=3846,t=42.95s | client1:n=4081,t=46.67s | client4:n=3907,t=49.51s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R6] benchmark agg(cpu)=0.08320s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+C:\Users\Abillou\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:97: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+[SRV][R6] eval: loss=1.2288, acc=0.6507, eval_time=6.54s
+[SRV][R6] early-stop monitor improved: acc=0.6507
+
+[SRV][R7] start
+[SRV][R7] -> client1: n=4081 (cached shard)
+[SRV][R7] -> client3: n=3846 (cached shard)
+[SRV][R7] -> client4: n=3907 (cached shard)
+[SRV][R7] -> client2: n=4118 (cached shard)
+[SRV][R7] <- client3: n=3846, train=47.23s
+[SRV][R7] <- client1: n=4081, train=48.31s
+[SRV][R7] <- client4: n=3907, train=51.28s
+[SRV][R7] <- client2: n=4118, train=41.47s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R7] agg=0.24766s | train_round=55.90s (server+clients+agg, no eval)
+[SRV][R7] hosts { client2:n=4118,t=41.47s | client3:n=3846,t=47.23s | client1:n=4081,t=48.31s | client4:n=3907,t=51.28s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R7] benchmark agg(cpu)=0.08486s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R7] eval: loss=1.1888, acc=0.6620, eval_time=8.53s
+[SRV][R7] early-stop monitor improved: acc=0.6620
+
+[SRV][R8] start
+[SRV][R8] -> client2: n=4118 (cached shard)
+[SRV][R8] -> client4: n=3907 (cached shard)
+[SRV][R8] -> client3: n=3846 (cached shard)
+[SRV][R8] -> client1: n=4081 (cached shard)
+[SRV][R8] <- client2: n=4118, train=42.45s
+[SRV][R8] <- client3: n=3846, train=51.37s
+[SRV][R8] <- client4: n=3907, train=53.08s
+[SRV][R8] <- client1: n=4081, train=52.08s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R8] agg=0.12982s | train_round=54.72s (server+clients+agg, no eval)
+[SRV][R8] hosts { client2:n=4118,t=42.45s | client3:n=3846,t=51.37s | client1:n=4081,t=52.08s | client4:n=3907,t=53.08s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R8] benchmark agg(cpu)=0.08325s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R8] eval: loss=1.0265, acc=0.7111, eval_time=6.95s
+[SRV][R8] early-stop monitor improved: acc=0.7111
+
+[SRV][R9] start
+[SRV][R9] -> client4: n=3907 (cached shard)
+[SRV][R9] -> client3: n=3846 (cached shard)
+[SRV][R9] -> client2: n=4118 (cached shard)
+[SRV][R9] -> client1: n=4081 (cached shard)
+[SRV][R9] <- client2: n=4118, train=42.81s
+[SRV][R9] <- client3: n=3846, train=48.43s
+[SRV][R9] <- client1: n=4081, train=50.11s
+[SRV][R9] <- client4: n=3907, train=55.10s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R9] agg=0.25466s | train_round=55.48s (server+clients+agg, no eval)
+[SRV][R9] hosts { client2:n=4118,t=42.81s | client3:n=3846,t=48.43s | client1:n=4081,t=50.11s | client4:n=3907,t=55.10s }        
+
+[AGG] CPU is being used for aggregation.
+[SRV][R9] benchmark agg(cpu)=0.08236s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R9] eval: loss=0.9589, acc=0.7347, eval_time=6.33s
+[SRV][R9] early-stop monitor improved: acc=0.7347
+
+[SRV][R10] start
+[SRV][R10] -> client3: n=3846 (cached shard)
+[SRV][R10] -> client2: n=4118 (cached shard)
+[SRV][R10] -> client1: n=4081 (cached shard)
+[SRV][R10] -> client4: n=3907 (cached shard)
+[SRV][R10] <- client2: n=4118, train=41.34s
+[SRV][R10] <- client3: n=3846, train=50.91s
+[SRV][R10] <- client1: n=4081, train=50.26s
+[SRV][R10] <- client4: n=3907, train=52.29s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R10] agg=0.07748s | train_round=54.90s (server+clients+agg, no eval)
+[SRV][R10] hosts { client2:n=4118,t=41.34s | client3:n=3846,t=50.91s | client1:n=4081,t=50.26s | client4:n=3907,t=52.29s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R10] benchmark agg(cpu)=0.09011s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R10] eval: loss=0.8923, acc=0.7518, eval_time=6.25s
+
+[SRV][R10] Detailed Classification Report:
+                precision    recall  f1-score   support
+
+        DOMAIN       0.00      0.00      0.00        10
+         EMAIL       0.00      0.00      0.00         5
+      FILEPATH       0.23      0.05      0.08        63
+          IPV4       0.00      0.00      0.00        12
+ Infrastucture       0.00      0.00      0.00         9
+           MD5       0.00      0.00      0.00         3
+   REGISTRYKEY       0.00      0.00      0.00         4
+          SHA1       0.00      0.00      0.00        12
+          SHA2       0.29      0.06      0.10        32
+      SOFTWARE       0.49      0.55      0.52       246
+          TIME       0.71      0.05      0.10        95
+           URL       0.72      0.52      0.60        25
+attack-pattern       0.72      0.65      0.68       241
+        benign       0.87      0.96      0.91      2000
+      campaign       0.00      0.00      0.00        26
+          hash       0.00      0.00      0.00         3
+      identity       0.67      0.64      0.65       233
+      location       0.63      0.54      0.58       281
+       malware       0.61      0.81      0.70       382
+  threat-actor       0.61      0.76      0.68       178
+         tools       0.00      0.00      0.00        78
+           url       0.00      0.00      0.00         1
+ vulnerability       0.43      0.41      0.42        49
+
+      accuracy                           0.75      3988
+     macro avg       0.30      0.26      0.26      3988
+  weighted avg       0.71      0.75      0.72      3988
+
+
+[SRV][R10] Threat Detection Summary:
+  Benign samples:     2000 (50.2%)
+  Malicious samples:  1988 (49.8%)
+  Benign accuracy:    95.85%
+  Malicious accuracy: 54.38%
+[SRV][R10] early-stop monitor improved: acc=0.7518
+
+[SRV][R11] start
+[SRV][R11] -> client2: n=4118 (cached shard)
+[SRV][R11] -> client4: n=3907 (cached shard)
+[SRV][R11] -> client1: n=4081 (cached shard)
+[SRV][R11] -> client3: n=3846 (cached shard)
+[SRV][R11] <- client2: n=4118, train=37.99s
+[SRV][R11] <- client4: n=3907, train=50.21s
+[SRV][R11] <- client3: n=3846, train=44.11s
+[SRV][R11] <- client1: n=4081, train=47.56s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R11] agg=0.12366s | train_round=73.19s (server+clients+agg, no eval)
+[SRV][R11] hosts { client2:n=4118,t=37.99s | client3:n=3846,t=44.11s | client1:n=4081,t=47.56s | client4:n=3907,t=50.21s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R11] benchmark agg(cpu)=0.08358s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+C:\Users\Abillou\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:97: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+[SRV][R11] eval: loss=0.8583, acc=0.7593, eval_time=6.20s
+[SRV][R11] early-stop monitor improved: acc=0.7593
+
+[SRV][R12] start
+[SRV][R12] -> client4: n=3907 (cached shard)
+[SRV][R12] -> client3: n=3846 (cached shard)
+[SRV][R12] -> client1: n=4081 (cached shard)
+[SRV][R12] -> client2: n=4118 (cached shard)
+[SRV][R12] <- client4: n=3907, train=41.91s
+[SRV][R12] <- client1: n=4081, train=45.04s
+[SRV][R12] <- client3: n=3846, train=47.73s
+[SRV][R12] <- client2: n=4118, train=46.04s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R12] agg=0.18646s | train_round=48.84s (server+clients+agg, no eval)
+[SRV][R12] hosts { client2:n=4118,t=46.04s | client3:n=3846,t=47.73s | client1:n=4081,t=45.04s | client4:n=3907,t=41.91s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R12] benchmark agg(cpu)=0.08427s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R12] eval: loss=0.7980, acc=0.7856, eval_time=6.02s
+[SRV][R12] early-stop monitor improved: acc=0.7856
+
+[SRV][R13] start
+[SRV][R13] -> client1: n=4081 (cached shard)
+[SRV][R13] -> client4: n=3907 (cached shard)
+[SRV][R13] -> client2: n=4118 (cached shard)
+[SRV][R13] -> client3: n=3846 (cached shard)
+[SRV][R13] <- client2: n=4118, train=42.35s
+[SRV][R13] <- client1: n=4081, train=50.10s
+[SRV][R13] <- client3: n=3846, train=47.85s
+[SRV][R13] <- client4: n=3907, train=51.41s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R13] agg=0.20470s | train_round=52.42s (server+clients+agg, no eval)
+[SRV][R13] hosts { client2:n=4118,t=42.35s | client3:n=3846,t=47.85s | client1:n=4081,t=50.10s | client4:n=3907,t=51.41s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R13] benchmark agg(cpu)=0.08450s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R13] eval: loss=0.7683, acc=0.7951, eval_time=6.08s
+[SRV][R13] early-stop monitor improved: acc=0.7951
+
+[SRV][R14] start
+[SRV][R14] -> client4: n=3907 (cached shard)
+[SRV][R14] -> client1: n=4081 (cached shard)
+[SRV][R14] -> client3: n=3846 (cached shard)
+[SRV][R14] -> client2: n=4118 (cached shard)
+[SRV][R14] <- client1: n=4081, train=44.10s
+[SRV][R14] <- client3: n=3846, train=50.61s
+[SRV][R14] <- client4: n=3907, train=53.42s
+[SRV][R14] <- client2: n=4118, train=40.89s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R14] agg=0.13748s | train_round=58.58s (server+clients+agg, no eval)
+[SRV][R14] hosts { client2:n=4118,t=40.89s | client3:n=3846,t=50.61s | client1:n=4081,t=44.10s | client4:n=3907,t=53.42s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R14] benchmark agg(cpu)=0.08178s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R14] eval: loss=0.7141, acc=0.8087, eval_time=6.09s
+[SRV][R14] early-stop monitor improved: acc=0.8087
+
+[SRV][R15] start
+[SRV][R15] -> client3: n=3846 (cached shard)
+[SRV][R15] -> client2: n=4118 (cached shard)
+[SRV][R15] -> client4: n=3907 (cached shard)
+[SRV][R15] -> client1: n=4081 (cached shard)
+[SRV][R15] <- client2: n=4118, train=42.26s
+[SRV][R15] <- client3: n=3846, train=43.25s
+[SRV][R15] <- client4: n=3907, train=51.74s
+[SRV][R15] <- client1: n=4081, train=51.47s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R15] agg=0.14408s | train_round=54.13s (server+clients+agg, no eval)
+[SRV][R15] hosts { client2:n=4118,t=42.26s | client3:n=3846,t=43.25s | client1:n=4081,t=51.47s | client4:n=3907,t=51.74s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R15] benchmark agg(cpu)=0.08462s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R15] eval: loss=0.7151, acc=0.8170, eval_time=10.50s
+
+[SRV][R15] Detailed Classification Report:
+                precision    recall  f1-score   support
+
+        DOMAIN       0.00      0.00      0.00        10
+         EMAIL       1.00      0.20      0.33         5
+      FILEPATH       0.60      0.59      0.59        63
+          IPV4       0.55      0.50      0.52        12
+ Infrastucture       0.00      0.00      0.00         9
+           MD5       0.00      0.00      0.00         3
+   REGISTRYKEY       0.00      0.00      0.00         4
+          SHA1       1.00      0.08      0.15        12
+          SHA2       0.50      0.28      0.36        32
+      SOFTWARE       0.63      0.70      0.66       246
+          TIME       0.47      0.25      0.33        95
+           URL       0.64      0.84      0.72        25
+attack-pattern       0.77      0.80      0.78       241
+        benign       0.89      0.96      0.92      2000
+      campaign       0.00      0.00      0.00        26
+          hash       0.00      0.00      0.00         3
+      identity       0.81      0.70      0.75       233
+      location       0.75      0.66      0.70       281
+       malware       0.85      0.84      0.84       382
+  threat-actor       0.71      0.83      0.77       178
+         tools       0.76      0.33      0.46        78
+           url       0.00      0.00      0.00         1
+ vulnerability       0.59      0.55      0.57        49
+
+      accuracy                           0.82      3988
+     macro avg       0.50      0.40      0.41      3988
+  weighted avg       0.80      0.82      0.80      3988
+
+
+[SRV][R15] Threat Detection Summary:
+  Benign samples:     2000 (50.2%)
+  Malicious samples:  1988 (49.8%)
+  Benign accuracy:    96.40%
+  Malicious accuracy: 66.90%
+[SRV][R15] early-stop monitor improved: acc=0.8170
+
+[SRV][R16] start
+[SRV][R16] -> client2: n=4118 (cached shard)
+[SRV][R16] -> client3: n=3846 (cached shard)
+[SRV][R16] -> client1: n=4081 (cached shard)
+[SRV][R16] -> client4: n=3907 (cached shard)
+[SRV][R16] <- client2: n=4118, train=37.20s
+[SRV][R16] <- client4: n=3907, train=44.87s
+[SRV][R16] <- client3: n=3846, train=50.77s
+[SRV][R16] <- client1: n=4081, train=50.63s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R16] agg=0.26095s | train_round=52.65s (server+clients+agg, no eval)
+[SRV][R16] hosts { client2:n=4118,t=37.20s | client3:n=3846,t=50.77s | client1:n=4081,t=50.63s | client4:n=3907,t=44.87s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R16] benchmark agg(cpu)=0.08379s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+C:\Users\Abillou\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:97: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+[SRV][R16] eval: loss=0.6671, acc=0.8275, eval_time=8.04s
+[SRV][R16] early-stop monitor improved: acc=0.8275
+
+[SRV][R17] start
+[SRV][R17] -> client2: n=4118 (cached shard)
+[SRV][R17] -> client1: n=4081 (cached shard)
+[SRV][R17] -> client4: n=3907 (cached shard)
+[SRV][R17] -> client3: n=3846 (cached shard)
+[SRV][R17] <- client2: n=4118, train=40.60s
+[SRV][R17] <- client4: n=3907, train=51.43s
+[SRV][R17] <- client1: n=4081, train=52.27s
+[SRV][R17] <- client3: n=3846, train=51.06s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R17] agg=0.03629s | train_round=53.62s (server+clients+agg, no eval)
+[SRV][R17] hosts { client2:n=4118,t=40.60s | client3:n=3846,t=51.06s | client1:n=4081,t=52.27s | client4:n=3907,t=51.43s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R17] benchmark agg(cpu)=0.08399s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R17] eval: loss=0.6320, acc=0.8353, eval_time=7.15s
+[SRV][R17] early-stop monitor improved: acc=0.8353
+
+[SRV][R18] start
+[SRV][R18] -> client2: n=4118 (cached shard)
+[SRV][R18] -> client1: n=4081 (cached shard)
+[SRV][R18] -> client3: n=3846 (cached shard)
+[SRV][R18] -> client4: n=3907 (cached shard)
+[SRV][R18] <- client2: n=4118, train=42.34s
+[SRV][R18] <- client1: n=4081, train=44.48s
+[SRV][R18] <- client4: n=3907, train=44.96s
+[SRV][R18] <- client3: n=3846, train=73.21s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R18] agg=0.26684s | train_round=99.87s (server+clients+agg, no eval)
+[SRV][R18] hosts { client2:n=4118,t=42.34s | client3:n=3846,t=73.21s | client1:n=4081,t=44.48s | client4:n=3907,t=44.96s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R18] benchmark agg(cpu)=0.08409s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R18] eval: loss=0.6306, acc=0.8403, eval_time=6.45s
+[SRV][R18] early-stop monitor improved: acc=0.8403
+
+[SRV][R19] start
+[SRV][R19] -> client3: n=3846 (cached shard)
+[SRV][R19] -> client2: n=4118 (cached shard)
+[SRV][R19] -> client4: n=3907 (cached shard)
+[SRV][R19] -> client1: n=4081 (cached shard)
+[SRV][R19] <- client2: n=4118, train=40.60s
+[SRV][R19] <- client3: n=3846, train=43.10s
+[SRV][R19] <- client4: n=3907, train=44.51s
+[SRV][R19] <- client1: n=4081, train=45.42s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R19] agg=0.04512s | train_round=72.59s (server+clients+agg, no eval)
+[SRV][R19] hosts { client2:n=4118,t=40.60s | client3:n=3846,t=43.10s | client1:n=4081,t=45.42s | client4:n=3907,t=44.51s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R19] benchmark agg(cpu)=0.08446s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R19] eval: loss=0.5817, acc=0.8495, eval_time=6.15s
+[SRV][R19] early-stop monitor improved: acc=0.8495
+
+[SRV][R20] start
+[SRV][R20] -> client4: n=3907 (cached shard)
+[SRV][R20] -> client3: n=3846 (cached shard)
+[SRV][R20] -> client2: n=4118 (cached shard)
+[SRV][R20] -> client1: n=4081 (cached shard)
+[SRV][R20] <- client4: n=3907, train=45.33s
+[SRV][R20] <- client3: n=3846, train=43.33s
+[SRV][R20] <- client2: n=4118, train=41.58s
+[SRV][R20] <- client1: n=4081, train=45.41s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R20] agg=0.25701s | train_round=75.68s (server+clients+agg, no eval)
+[SRV][R20] hosts { client2:n=4118,t=41.58s | client3:n=3846,t=43.33s | client1:n=4081,t=45.41s | client4:n=3907,t=45.33s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R20] benchmark agg(cpu)=0.08268s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R20] eval: loss=0.5679, acc=0.8566, eval_time=5.99s
+
+[SRV][R20] Detailed Classification Report:
+                precision    recall  f1-score   support
+
+        DOMAIN       0.00      0.00      0.00        10
+         EMAIL       1.00      0.20      0.33         5
+      FILEPATH       0.72      0.76      0.74        63
+          IPV4       0.67      0.67      0.67        12
+ Infrastucture       0.00      0.00      0.00         9
+           MD5       0.00      0.00      0.00         3
+   REGISTRYKEY       1.00      0.75      0.86         4
+          SHA1       0.50      0.50      0.50        12
+          SHA2       0.70      0.50      0.58        32
+      SOFTWARE       0.77      0.78      0.78       246
+          TIME       0.68      0.55      0.61        95
+           URL       0.81      0.88      0.85        25
+attack-pattern       0.81      0.80      0.81       241
+        benign       0.91      0.97      0.94      2000
+      campaign       0.64      0.35      0.45        26
+          hash       0.00      0.00      0.00         3
+      identity       0.82      0.76      0.79       233
+      location       0.79      0.68      0.73       281
+       malware       0.88      0.88      0.88       382
+  threat-actor       0.75      0.84      0.79       178
+         tools       0.78      0.55      0.65        78
+           url       0.00      0.00      0.00         1
+ vulnerability       0.72      0.67      0.69        49
+
+      accuracy                           0.86      3988
+     macro avg       0.61      0.53      0.55      3988
+  weighted avg       0.85      0.86      0.85      3988
+
+
+[SRV][R20] Threat Detection Summary:
+  Benign samples:     2000 (50.2%)
+  Malicious samples:  1988 (49.8%)
+  Benign accuracy:    96.65%
+  Malicious accuracy: 74.60%
+[SRV][R20] early-stop monitor improved: acc=0.8566
+
+[SRV][R21] start
+[SRV][R21] -> client3: n=3846 (cached shard)
+[SRV][R21] -> client2: n=4118 (cached shard)
+[SRV][R21] -> client4: n=3907 (cached shard)
+[SRV][R21] -> client1: n=4081 (cached shard)
+[SRV][R21] <- client2: n=4118, train=41.88s
+[SRV][R21] <- client3: n=3846, train=45.20s
+[SRV][R21] <- client4: n=3907, train=44.27s
+[SRV][R21] <- client1: n=4081, train=43.86s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R21] agg=0.20026s | train_round=64.25s (server+clients+agg, no eval)
+[SRV][R21] hosts { client2:n=4118,t=41.88s | client3:n=3846,t=45.20s | client1:n=4081,t=43.86s | client4:n=3907,t=44.27s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R21] benchmark agg(cpu)=0.08352s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+C:\Users\Abillou\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:97: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+[SRV][R21] eval: loss=0.5529, acc=0.8583, eval_time=9.88s
+[SRV][R21] early-stop monitor improved: acc=0.8583
+
+[SRV][R22] start
+[SRV][R22] -> client3: n=3846 (cached shard)
+[SRV][R22] -> client4: n=3907 (cached shard)
+[SRV][R22] -> client2: n=4118 (cached shard)
+[SRV][R22] -> client1: n=4081 (cached shard)
+[SRV][R22] <- client3: n=3846, train=40.73s
+[SRV][R22] <- client4: n=3907, train=43.02s
+[SRV][R22] <- client2: n=4118, train=42.22s
+[SRV][R22] <- client1: n=4081, train=45.29s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R22] agg=0.39224s | train_round=74.37s (server+clients+agg, no eval)
+[SRV][R22] hosts { client2:n=4118,t=42.22s | client3:n=3846,t=40.73s | client1:n=4081,t=45.29s | client4:n=3907,t=43.02s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R22] benchmark agg(cpu)=0.08285s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R22] eval: loss=0.5736, acc=0.8531, eval_time=7.75s
+[SRV][R22] no acc improvement (1/5)
+
+[SRV][R23] start
+[SRV][R23] -> client4: n=3907 (cached shard)
+[SRV][R23] -> client1: n=4081 (cached shard)
+[SRV][R23] -> client3: n=3846 (cached shard)
+[SRV][R23] -> client2: n=4118 (cached shard)
+[SRV][R23] <- client3: n=3846, train=42.63s
+[SRV][R23] <- client2: n=4118, train=42.26s
+[SRV][R23] <- client4: n=3907, train=45.80s
+[SRV][R23] <- client1: n=4081, train=45.83s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R23] agg=0.34454s | train_round=47.10s (server+clients+agg, no eval)
+[SRV][R23] hosts { client2:n=4118,t=42.26s | client3:n=3846,t=42.63s | client1:n=4081,t=45.83s | client4:n=3907,t=45.80s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R23] benchmark agg(cpu)=0.08534s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R23] eval: loss=0.5124, acc=0.8726, eval_time=6.67s
+[SRV][R23] early-stop monitor improved: acc=0.8726
+
+[SRV][R24] start
+[SRV][R24] -> client2: n=4118 (cached shard)
+[SRV][R24] -> client1: n=4081 (cached shard)
+[SRV][R24] -> client4: n=3907 (cached shard)
+[SRV][R24] -> client3: n=3846 (cached shard)
+[SRV][R24] <- client2: n=4118, train=40.40s
+[SRV][R24] <- client1: n=4081, train=43.52s
+[SRV][R24] <- client4: n=3907, train=43.57s
+[SRV][R24] <- client3: n=3846, train=41.10s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R24] agg=0.20636s | train_round=67.56s (server+clients+agg, no eval)
+[SRV][R24] hosts { client2:n=4118,t=40.40s | client3:n=3846,t=41.10s | client1:n=4081,t=43.52s | client4:n=3907,t=43.57s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R24] benchmark agg(cpu)=0.08338s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R24] eval: loss=0.5143, acc=0.8716, eval_time=6.46s
+[SRV][R24] no acc improvement (1/5)
+
+[SRV][R25] start
+[SRV][R25] -> client3: n=3846 (cached shard)
+[SRV][R25] -> client2: n=4118 (cached shard)
+[SRV][R25] -> client1: n=4081 (cached shard)
+[SRV][R25] -> client4: n=3907 (cached shard)
+[SRV][R25] <- client4: n=3907, train=39.72s
+[SRV][R25] <- client3: n=3846, train=44.09s
+[SRV][R25] <- client2: n=4118, train=43.48s
+[SRV][R25] <- client1: n=4081, train=44.31s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R25] agg=0.19640s | train_round=46.19s (server+clients+agg, no eval)
+[SRV][R25] hosts { client2:n=4118,t=43.48s | client3:n=3846,t=44.09s | client1:n=4081,t=44.31s | client4:n=3907,t=39.72s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R25] benchmark agg(cpu)=0.08297s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R25] eval: loss=0.5058, acc=0.8774, eval_time=6.19s
+
+[SRV][R25] Detailed Classification Report:
+                precision    recall  f1-score   support
+
+        DOMAIN       0.50      0.10      0.17        10
+         EMAIL       0.75      0.60      0.67         5
+      FILEPATH       0.78      0.79      0.79        63
+          IPV4       0.71      0.83      0.77        12
+ Infrastucture       1.00      0.33      0.50         9
+           MD5       1.00      0.33      0.50         3
+   REGISTRYKEY       1.00      0.75      0.86         4
+          SHA1       0.43      0.50      0.46        12
+          SHA2       0.73      0.75      0.74        32
+      SOFTWARE       0.82      0.80      0.81       246
+          TIME       0.71      0.63      0.67        95
+           URL       0.92      0.88      0.90        25
+attack-pattern       0.87      0.84      0.85       241
+        benign       0.93      0.96      0.94      2000
+      campaign       0.70      0.54      0.61        26
+          hash       0.00      0.00      0.00         3
+      identity       0.82      0.78      0.80       233
+      location       0.82      0.73      0.77       281
+       malware       0.88      0.92      0.90       382
+  threat-actor       0.78      0.85      0.82       178
+         tools       0.89      0.62      0.73        78
+           url       0.00      0.00      0.00         1
+ vulnerability       0.78      0.73      0.76        49
+
+      accuracy                           0.88      3988
+     macro avg       0.73      0.62      0.65      3988
+  weighted avg       0.87      0.88      0.87      3988
+
+
+[SRV][R25] Threat Detection Summary:
+  Benign samples:     2000 (50.2%)
+  Malicious samples:  1988 (49.8%)
+  Benign accuracy:    96.35%
+  Malicious accuracy: 79.07%
+[SRV][R25] early-stop monitor improved: acc=0.8774
+
+[SRV][R26] start
+[SRV][R26] -> client1: n=4081 (cached shard)
+[SRV][R26] -> client2: n=4118 (cached shard)
+[SRV][R26] -> client4: n=3907 (cached shard)
+[SRV][R26] -> client3: n=3846 (cached shard)
+[SRV][R26] <- client2: n=4118, train=38.10s
+[SRV][R26] <- client1: n=4081, train=42.31s
+[SRV][R26] <- client4: n=3907, train=39.16s
+[SRV][R26] <- client3: n=3846, train=41.78s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R26] agg=0.37713s | train_round=68.58s (server+clients+agg, no eval)
+[SRV][R26] hosts { client2:n=4118,t=38.10s | client3:n=3846,t=41.78s | client1:n=4081,t=42.31s | client4:n=3907,t=39.16s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R26] benchmark agg(cpu)=0.08321s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+C:\Users\Abillou\AppData\Local\Programs\Python\Python312\Lib\site-packages\keras\src\layers\core\embedding.py:97: UserWarning: Argument `input_length` is deprecated. Just remove it.
+  warnings.warn(
+[SRV][R26] eval: loss=0.4930, acc=0.8801, eval_time=6.14s
+[SRV][R26] early-stop monitor improved: acc=0.8801
+
+[SRV][R27] start
+[SRV][R27] -> client2: n=4118 (cached shard)
+[SRV][R27] -> client4: n=3907 (cached shard)
+[SRV][R27] -> client1: n=4081 (cached shard)
+[SRV][R27] -> client3: n=3846 (cached shard)
+[SRV][R27] <- client2: n=4118, train=43.17s
+[SRV][R27] <- client3: n=3846, train=41.60s
+[SRV][R27] <- client4: n=3907, train=47.36s
+[SRV][R27] <- client1: n=4081, train=49.51s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R27] agg=0.31255s | train_round=51.51s (server+clients+agg, no eval)
+[SRV][R27] hosts { client2:n=4118,t=43.17s | client3:n=3846,t=41.60s | client1:n=4081,t=49.51s | client4:n=3907,t=47.36s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R27] benchmark agg(cpu)=0.08242s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R27] eval: loss=0.4750, acc=0.8857, eval_time=5.87s
+[SRV][R27] early-stop monitor improved: acc=0.8857
+
+[SRV][R28] start
+[SRV][R28] -> client2: n=4118 (cached shard)
+[SRV][R28] -> client1: n=4081 (cached shard)
+[SRV][R28] -> client4: n=3907 (cached shard)
+[SRV][R28] -> client3: n=3846 (cached shard)
+[SRV][R28] <- client2: n=4118, train=41.91s
+[SRV][R28] <- client4: n=3907, train=43.28s
+[SRV][R28] <- client1: n=4081, train=46.04s
+[SRV][R28] <- client3: n=3846, train=37.10s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R28] agg=0.39619s | train_round=59.97s (server+clients+agg, no eval)
+[SRV][R28] hosts { client2:n=4118,t=41.91s | client3:n=3846,t=37.10s | client1:n=4081,t=46.04s | client4:n=3907,t=43.28s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R28] benchmark agg(cpu)=0.08247s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R28] eval: loss=0.4709, acc=0.8864, eval_time=5.94s
+[SRV][R28] no acc improvement (1/5)
+
+[SRV][R29] start
+[SRV][R29] -> client4: n=3907 (cached shard)
+[SRV][R29] -> client1: n=4081 (cached shard)
+[SRV][R29] -> client3: n=3846 (cached shard)
+[SRV][R29] -> client2: n=4118 (cached shard)
+[SRV][R29] <- client3: n=3846, train=36.90s
+[SRV][R29] <- client4: n=3907, train=44.00s
+[SRV][R29] <- client2: n=4118, train=41.90s
+[SRV][R29] <- client1: n=4081, train=46.06s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R29] agg=0.31812s | train_round=47.31s (server+clients+agg, no eval)
+[SRV][R29] hosts { client2:n=4118,t=41.90s | client3:n=3846,t=36.90s | client1:n=4081,t=46.06s | client4:n=3907,t=44.00s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R29] benchmark agg(cpu)=0.08304s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R29] eval: loss=0.4529, acc=0.8869, eval_time=10.03s
+[SRV][R29] early-stop monitor improved: acc=0.8869
+
+[SRV][R30] start
+[SRV][R30] -> client1: n=4081 (cached shard)
+[SRV][R30] -> client3: n=3846 (cached shard)
+[SRV][R30] -> client2: n=4118 (cached shard)
+[SRV][R30] -> client4: n=3907 (cached shard)
+[SRV][R30] <- client3: n=3846, train=42.70s
+[SRV][R30] <- client1: n=4081, train=45.77s
+[SRV][R30] <- client2: n=4118, train=43.13s
+[SRV][R30] <- client4: n=3907, train=44.37s
+
+[AGG] GPU is being used for aggregation.
+[SRV][R30] agg=0.28467s | train_round=70.42s (server+clients+agg, no eval)
+[SRV][R30] hosts { client2:n=4118,t=43.13s | client3:n=3846,t=42.70s | client1:n=4081,t=45.77s | client4:n=3907,t=44.37s }       
+
+[AGG] CPU is being used for aggregation.
+[SRV][R30] benchmark agg(cpu)=0.08313s (NOT used for GLOBAL_WEIGHTS; not counted in train_round)
+[SRV][R30] eval: loss=0.4540, acc=0.8914, eval_time=9.26s
+
+[SRV][R30] Detailed Classification Report:
+                precision    recall  f1-score   support
+
+        DOMAIN       0.80      0.40      0.53        10
+         EMAIL       0.62      1.00      0.77         5
+      FILEPATH       0.86      0.81      0.84        63
+          IPV4       0.83      0.83      0.83        12
+ Infrastucture       1.00      0.33      0.50         9
+           MD5       1.00      0.67      0.80         3
+   REGISTRYKEY       1.00      0.75      0.86         4
+          SHA1       0.73      0.67      0.70        12
+          SHA2       0.75      0.84      0.79        32
+      SOFTWARE       0.84      0.80      0.82       246
+          TIME       0.75      0.71      0.73        95
+           URL       0.85      0.88      0.86        25
+attack-pattern       0.85      0.88      0.86       241
+        benign       0.94      0.96      0.95      2000
+      campaign       0.76      0.62      0.68        26
+          hash       0.00      0.00      0.00         3
+      identity       0.83      0.81      0.82       233
+      location       0.80      0.78      0.79       281
+       malware       0.92      0.92      0.92       382
+  threat-actor       0.82      0.88      0.85       178
+         tools       0.77      0.73      0.75        78
+           url       0.00      0.00      0.00         1
+ vulnerability       0.76      0.80      0.78        49
+
+      accuracy                           0.89      3988
+     macro avg       0.76      0.70      0.71      3988
+  weighted avg       0.89      0.89      0.89      3988
+
+
+[SRV][R30] Threat Detection Summary:
+  Benign samples:     2000 (50.2%)
+  Malicious samples:  1988 (49.8%)
+  Benign accuracy:    95.85%
+  Malicious accuracy: 82.39%
+[SRV][R30] early-stop monitor improved: acc=0.8914
