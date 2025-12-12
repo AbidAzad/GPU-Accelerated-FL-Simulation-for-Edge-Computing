@@ -118,15 +118,75 @@ def build_model(num_classes: int):
     raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
 
 
+# ============================================================
+# OPTIMIZER / COMPILE HELPERS
+# ============================================================
+
+def _attach_compile_info(model, optimizer, loss, metrics) -> None:
+    """Attach compile metadata so clients can recreate/reset optimizers safely."""
+    try:
+        model._fl_compile_loss = loss
+        model._fl_compile_metrics = list(metrics)
+        # Store optimizer in a serializable form
+        model._fl_optimizer_class_name = optimizer.__class__.__name__
+        model._fl_optimizer_config = optimizer.get_config()
+    except Exception:
+        # Best-effort only; training can still proceed without this metadata.
+        pass
+
+
+def _compile_for_federated(model, optimizer, loss: str = "categorical_crossentropy",
+                          metrics: List[str] | Tuple[str, ...] = ("accuracy",)):
+    """Compile the model and store metadata for later optimizer resets."""
+    model.compile(optimizer=optimizer, loss=loss, metrics=list(metrics))
+    _attach_compile_info(model, optimizer, loss, metrics)
+    return model
+
+
+def reset_optimizer(model) -> None:
+    """Recreate the model optimizer (fresh state) while keeping loss/metrics.
+
+    Intended usage (client-side):
+      1) model.set_weights(global_weights)
+      2) reset_optimizer(model)  # wipes Adam/SGD momentum, etc.
+      3) model.fit(...)
+    """
+    loss = getattr(model, "_fl_compile_loss", getattr(model, "loss", "categorical_crossentropy"))
+    metrics = getattr(model, "_fl_compile_metrics", ["accuracy"])
+
+    opt = None
+
+    # Preferred path: use stored class+config captured at build/compile time.
+    cls_name = getattr(model, "_fl_optimizer_class_name", None)
+    cfg = getattr(model, "_fl_optimizer_config", None)
+    if cls_name and cfg:
+        try:
+            opt = tf.keras.optimizers.deserialize({"class_name": cls_name, "config": cfg})
+        except Exception:
+            opt = None
+
+    # Fallback: clone whatever optimizer is currently attached to the model.
+    if opt is None:
+        try:
+            opt = model.optimizer.__class__.from_config(model.optimizer.get_config())
+        except Exception:
+            opt = tf.keras.optimizers.Adam()
+
+    model.compile(optimizer=opt, loss=loss, metrics=list(metrics))
+    _attach_compile_info(model, opt, loss, metrics)
+
+
 def _build_lstm(num_classes: int):
     model = Sequential()
     model.add(Embedding(MAX_NB_WORDS, EMBEDDING_DIM, input_length=MAX_SEQ_LENGTH))
     model.add(LSTM(150, dropout=0.2, recurrent_dropout=0.2))
     model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation="softmax"))
-    model.compile(
+    optimizer = tf.keras.optimizers.Adam()
+    _compile_for_federated(
+        model,
+        optimizer=optimizer,
         loss="categorical_crossentropy",
-        optimizer="adam",
         metrics=["accuracy"],
     )
     return model
@@ -155,7 +215,8 @@ def _build_cifar_resnet(num_classes: int):
     )
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=CIFAR_LEARNING_RATE)
-    model.compile(
+    _compile_for_federated(
+        model,
         optimizer=optimizer,
         loss="categorical_crossentropy",
         metrics=["accuracy"],
@@ -187,8 +248,11 @@ def _build_network_mlp(num_classes: int):
 
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="NetworkTrafficMLP")
 
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+
+    _compile_for_federated(
+        model,
+        optimizer=optimizer,
         loss="categorical_crossentropy",
         metrics=["accuracy"],
     )

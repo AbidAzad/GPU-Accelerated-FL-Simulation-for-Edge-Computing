@@ -28,7 +28,7 @@ LOCAL_BATCH:  int = 64
 SPLIT_MODE: str = "sticky_calibrated"
 
 # Minimal number of connected remote clients to start
-MIN_CLIENTS: int = 4
+MIN_CLIENTS: int = 8
 
 # Warm-up (only for "sticky_calibrated")
 CALIB_SAMPLES_PER_HOST: int = 5000
@@ -46,9 +46,18 @@ ENABLE_CLIENT_SHARD_CACHE: bool = True
 SERVER_DOES_TRAIN: bool = False
 
 # Aggregation choice:
-#   "fedavg"  : plain FedAvg (with optional GPU backend)
+#   "fedavg"   : plain FedAvg (with optional GPU backend)
+#   "fedadam"  : FedAvg (CPU/GPU) to get an averaged model, then a *server-side*
+#               Adam step on the FedAvg delta (FedOpt / FedAdam)
 AGG_MODE: str = "fedavg"
 SERVER_MOMENTUM: float = 0.9  # reserved for future FedAvgM / momentum variants
+
+# ---- FedOpt / FedAdam server hyperparams (used when AGG_MODE == "fedadam") ----
+FEDOPT_LR: float = 1.0
+FEDOPT_BETA1: float = 0.9
+FEDOPT_BETA2: float = 0.999
+FEDOPT_EPS: float = 1e-8
+FEDOPT_WEIGHT_DECAY: float = 0.0
 
 # Whether to use GPU-based aggregator (CUDA) instead of pure CPU NumPy
 USE_GPU_AGG: bool = True  # safer default; flip to True once libfedavg_gpu is ready
@@ -58,8 +67,8 @@ TEST_BENCHMARK: bool = True  # only can be done with GPU servers
 
 # ---------------- Early stopping (server-side) ----------------
 EARLY_STOP_ENABLED: bool    = True    # flip to False to disable
-EARLY_STOP_PATIENCE: int    = 5       # rounds with no improvement before stopping
-EARLY_STOP_MIN_DELTA: float = 1e-3    # required improvement to reset patience
+EARLY_STOP_PATIENCE: int    = 15       # rounds with no improvement before stopping
+EARLY_STOP_MIN_DELTA: float = 1e-4    # required improvement to reset patience
 EARLY_STOP_MONITOR: str     = "acc"   # "acc" or "loss"
 EARLY_STOP_MODE: str        = "max"   # "max" for acc, "min" for loss
 
@@ -74,6 +83,11 @@ TRAINING_IS_DONE: bool = False
 
 GLOBAL_WEIGHTS: Optional[List[np.ndarray]] = None
 NUM_CLASSES: Optional[int] = None
+
+# Server-side optimizer state for FedOpt/FedAdam (persistent across rounds)
+SERVER_ADAM_M: Optional[List[np.ndarray]] = None
+SERVER_ADAM_V: Optional[List[np.ndarray]] = None
+SERVER_ADAM_T: int = 0
 
 # Per-round payloads/status/updates
 SHARD_PAYLOADS: Dict[str, Tuple[Optional[str], int]] = {}  # client_id -> (b64(X,y) or None, n)
@@ -422,7 +436,86 @@ def _run_one_time_calibration(participants: List[str]) -> None:
 
 
 # ======================== Aggregation (CPU or GPU) ========================
-def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
+# ======================== Server FedOpt (FedAdam) ========================
+def _ensure_server_adam_state(ref_weights: List[np.ndarray]) -> None:
+    """Init/resize server Adam buffers if weights change shape."""
+    global SERVER_ADAM_M, SERVER_ADAM_V, SERVER_ADAM_T
+
+    if SERVER_ADAM_M is None or SERVER_ADAM_V is None:
+        SERVER_ADAM_M = [np.zeros_like(w, dtype=np.float32) for w in ref_weights]
+        SERVER_ADAM_V = [np.zeros_like(w, dtype=np.float32) for w in ref_weights]
+        SERVER_ADAM_T = 0
+        return
+
+    if len(SERVER_ADAM_M) != len(ref_weights):
+        SERVER_ADAM_M = [np.zeros_like(w, dtype=np.float32) for w in ref_weights]
+        SERVER_ADAM_V = [np.zeros_like(w, dtype=np.float32) for w in ref_weights]
+        SERVER_ADAM_T = 0
+        return
+
+    for m, v, w in zip(SERVER_ADAM_M, SERVER_ADAM_V, ref_weights):
+        if m.shape != w.shape or v.shape != w.shape:
+            SERVER_ADAM_M = [np.zeros_like(w2, dtype=np.float32) for w2 in ref_weights]
+            SERVER_ADAM_V = [np.zeros_like(w2, dtype=np.float32) for w2 in ref_weights]
+            SERVER_ADAM_T = 0
+            return
+
+
+def _apply_fedadam(base_weights: List[np.ndarray],
+                   fedavg_weights: List[np.ndarray]) -> List[np.ndarray]:
+    """FedAdam: apply a server-side Adam update using the FedAvg delta.
+
+    We treat the pseudo-gradient as:
+        g = base_weights - fedavg_weights
+    so that an SGD step would move weights *towards* the FedAvg solution.
+    """
+    global SERVER_ADAM_T
+
+    if len(base_weights) != len(fedavg_weights):
+        raise ValueError("Weight list length mismatch in _apply_fedadam().")
+
+    _ensure_server_adam_state(base_weights)
+    assert SERVER_ADAM_M is not None and SERVER_ADAM_V is not None
+
+    SERVER_ADAM_T += 1
+    t = SERVER_ADAM_T
+
+    b1 = float(FEDOPT_BETA1)
+    b2 = float(FEDOPT_BETA2)
+    lr = float(FEDOPT_LR)
+    eps = float(FEDOPT_EPS)
+    wd = float(FEDOPT_WEIGHT_DECAY)
+
+    b1_t = b1 ** t
+    b2_t = b2 ** t
+
+    out: List[np.ndarray] = []
+    for i, (w0, wavg) in enumerate(zip(base_weights, fedavg_weights)):
+        w0_f = w0.astype(np.float32, copy=False)
+        wavg_f = wavg.astype(np.float32, copy=False)
+
+        # Pseudo-gradient (points from FedAvg -> base); subtracting it moves towards FedAvg.
+        g = (w0_f - wavg_f)
+
+        m = SERVER_ADAM_M[i] = (b1 * SERVER_ADAM_M[i] + (1.0 - b1) * g)
+        v = SERVER_ADAM_V[i] = (b2 * SERVER_ADAM_V[i] + (1.0 - b2) * (g * g))
+
+        m_hat = m / (1.0 - b1_t)
+        v_hat = v / (1.0 - b2_t)
+
+        step = lr * m_hat / (np.sqrt(v_hat) + eps)
+
+        # Optional decoupled weight decay (AdamW-style)
+        if wd != 0.0:
+            step = step + (lr * wd * w0_f)
+
+        w_new = (w0_f - step).astype(w0.dtype, copy=False)
+        out.append(w_new)
+
+    return out
+
+def _aggregate(base_weights: List[np.ndarray],
+               updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
     """
     Aggregate client updates into a new set of global weights.
     """
@@ -437,6 +530,9 @@ def _aggregate(updates: List[Tuple[List[np.ndarray], int]]) -> List[np.ndarray]:
 
     if AGG_MODE == "fedavg":
         return fedavg_weights
+
+    if AGG_MODE == "fedadam":
+        return _apply_fedadam(base_weights, fedavg_weights)
 
     raise ValueError(f"Unknown AGG_MODE: {AGG_MODE}")
 
@@ -608,7 +704,7 @@ def run_rounds():
         t_agg = time.perf_counter()
         with LOCK:
             updates_list = list(CLIENT_UPDATES.values())
-            new_weights = _aggregate(updates_list)
+            new_weights = _aggregate(start_weights_this_round, updates_list)
             GLOBAL_WEIGHTS = new_weights
             ROUND_IS_OPEN = False
             summary = " | ".join(

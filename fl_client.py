@@ -29,12 +29,16 @@ import fl_core
 # CONFIGURATION
 # ============================================================
 
-# Defaults come from the original client, but can be overridden via env vars.
-SERVER_URL = os.getenv("FL_SERVER_URL", "INSERT URL HERE")
-CLIENT_ID  = os.getenv("CLIENT_ID", "INSERT NAME HERE")
+# Global config variables (edit these directly; no CLI args required)
+SERVER_URL = "INSERT URL HERE"
+CLIENT_ID  = "INSERT NAME HERE"
 
 LOCAL_EPOCHS = 1
 CLIENT_BATCH = 64
+
+# If True: recreate optimizer each round after loading GLOBAL weights.
+# This resets Adam/SGD momentum and other optimizer state.
+RESET_OPTIMIZER_EACH_ROUND: bool = False
 
 
 # ============================================================
@@ -139,17 +143,13 @@ def main() -> None:
             fl_core.prime_model(model)
 
         # -------------------
-        # Build local model ONCE per client
-        # -------------------
-        if model is None:
-            num_classes = y.shape[1]
-            model = fl_core.build_model(num_classes)
-            fl_core.prime_model(model)
-
-        # -------------------
         # Load global weights into local model
         # -------------------
         model.set_weights(global_weights)
+
+        # Optionally reset optimizer state AFTER loading the new global weights
+        if RESET_OPTIMIZER_EACH_ROUND:
+            fl_core.reset_optimizer(model)
 
         # -------------------
         # Local training
